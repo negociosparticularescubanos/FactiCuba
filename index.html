@@ -470,6 +470,10 @@ body.ver-cliente .wrap,body.ver-cliente .topbar{display:none}
 
 <script>
 "use strict";
+/* Modo autónomo (GitHub Pages u otro hosting estático): sin `root` no hay
+   plugins de Perchance; las tasas y precios llegan por el espejo (CORS
+   abierto) y el informe se comparte por enlace con los datos en el hash. */
+const ES_PAGES = (typeof root === "undefined");
 /* ============ DATOS TERRITORIALES (168 municipios) ============ */
 const PROV_MUN = {
 "Pinar del Río":["Consolación del Sur","Guane","La Palma","Los Palacios","Mantua","Minas de Matahambre","Pinar del Río","San Juan y Martínez","San Luis","Sandino","Viñales"],
@@ -949,6 +953,8 @@ const URL_TOQUE="https://eltoque.com/tasas-de-cambio-cuba";
 const URL_TRMI="https://tasas.eltoque.com/v1/trmi";
 const URL_BCC="https://api.bc.gob.cu/v1/tasas-de-cambio/activas";
 const URL_ESPEJO="https://facticuba-tasas.magisequipo5.workers.dev/tasas";
+const URL_ESPEJO_REV=URL_ESPEJO.replace(/\/tasas$/,"/revolico");
+const URL_ESPEJO_WIKI=URL_ESPEJO.replace(/\/tasas$/,"/wiki");
 const URL_ONEI="https://www.onei.gob.cu/";
 const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 let CUM={1:184833,2:262496,3:298057,4:328608,5:359491,7:419863,8:450353};
@@ -969,7 +975,7 @@ async function fetchTexto(url,timeoutMs,opt){
       const t=await r.text();
       clearTimeout(to); return {txt:t,via:"proxy"};
     }
-    clearTimeout(to); return {error:"bloqueado por el navegador y sin proxy (el plugin superFetch no está cargado en esta página: si estás en el enlace público, guarda el generador en el editor para publicar la última versión; si estás en el editor, recarga la vista previa y revisa tu conexión)"};
+    clearTimeout(to); return {error:ES_PAGES?"bloqueado por el navegador y sin proxy (fuera de Perchance solo funcionan el espejo de tasas, Wikipedia y «Pegar texto»)":"bloqueado por el navegador y sin proxy (el plugin superFetch no está cargado en esta página: si estás en el enlace público, guarda el generador en el editor para publicar la última versión; si estás en el editor, recarga la vista previa y revisa tu conexión)"};
   }catch(e){ clearTimeout(to); return {error:String(e).slice(0,100)}; }
 }
 function limpio(h){ return h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/gi," ").replace(/\s+/g," "); }
@@ -1073,6 +1079,23 @@ async function srcEspejo(){
   if(!o.inf&&!o.ofi) throw new Error(j.errToque||j.errBCC||"el espejo no trajo tasas");
   return o;
 }
+/* Espejo: Revolico y Wikipedia ya parseados en el servidor (CORS abierto;
+   funcionan también fuera de Perchance). Si el espejo desplegado aún no
+   trae estas rutas, lanzan error y se usan las vías directas. */
+async function srcRevolicoEspejo(q){
+  const r=await fetchTexto(URL_ESPEJO_REV+"?q="+encodeURIComponent(q),20000);
+  if(!r.txt) throw new Error(r.error||"sin respuesta");
+  const j=JSON.parse(r.txt);
+  if(!j.items||!j.items.length) throw new Error(j.error||"el espejo no trajo anuncios (¿worker sin republicar?)");
+  return j.items.map(function(x){ return {titulo:String(x.titulo||""),precio:String(x.precio||""),moneda:String(x.moneda||""),fuente:"Revolico (espejo)",url:j.url||("https://www.revolico.com/search/?q="+encodeURIComponent(q))}; });
+}
+async function srcWikiEspejo(q){
+  const r=await fetchTexto(URL_ESPEJO_WIKI+"?q="+encodeURIComponent(q),15000);
+  if(!r.txt) throw new Error(r.error||"sin respuesta");
+  const j=JSON.parse(r.txt);
+  if(!j.items||!j.items.length) throw new Error(j.error||"el espejo no trajo resultados (¿worker sin republicar?)");
+  return j.items;
+}
 async function sincronizarTasas(manual){
   const st=$("syncStatus");
   try{ const t0=localStorage.getItem(TOK_KEY); if(t0&&$("tokInput")&&!$("tokInput").value) $("tokInput").value=t0; }catch(e){}
@@ -1150,7 +1173,7 @@ async function diagnosticarConexion(){
     else pasos.push("espejo de tasas: falla ✖ ("+String(r.error||"").slice(0,90)+")");
   }catch(e){ pasos.push("espejo de tasas: falla ✖ ("+String(e&&e.message||e).slice(0,90)+")"); }
   let sf=null; try{ if(typeof root!=="undefined"&&root.superFetch) sf=root.superFetch; }catch(e){}
-  pasos.push("proxy superFetch: "+(sf?"cargado ✅":"NO cargado ✖ (si estás en el enlace público, guarda el generador en el editor; si estás en el editor, recarga la vista previa)"));
+  pasos.push(ES_PAGES?"proxy superFetch: no aplica fuera de Perchance (se usa el espejo directo)":"proxy superFetch: "+(sf?"cargado ✅":"NO cargado ✖ (si estás en el enlace público, guarda el generador en el editor; si estás en el editor, recarga la vista previa)"));
   try{
     const c=new AbortController(); const to=setTimeout(()=>c.abort(),8000);
     await fetch(URL_BCC,{signal:c.signal}); clearTimeout(to);
@@ -1262,7 +1285,11 @@ async function buscarWebReal(){
   const queries=[q, $("sectorSel").value+" Cuba 2026", $("muniSel").value+" "+$("provSel").value+" Cuba"];
   try{
     for(let i=0;i<Math.min(2,queries.length);i++){
-      try{ const r=await wikiBuscar(queries[i]); r.forEach(function(x){ x.q=queries[i]; items.push(x); }); notas.push("Wikipedia: "+r.length+" en «"+queries[i].slice(0,40)+"»"); }
+      try{
+        let r=null;
+        try{ r=await srcWikiEspejo(queries[i]); }catch(ez){ r=await wikiBuscar(queries[i]); }
+        r.forEach(function(x){ x.q=queries[i]; items.push(x); }); notas.push("Wikipedia: "+r.length+" en «"+queries[i].slice(0,40)+"»");
+      }
       catch(e){ notas.push("Wikipedia («"+queries[i].slice(0,30)+"»): "+String(e.message||e).slice(0,80)); }
     }
     if(items.length){
@@ -1327,11 +1354,39 @@ async function redactarConFuentes(){
     if(ia) ia.textContent="✅ Borrador con fuentes listo en la descripción.";
   }catch(e){ if(st) st.textContent="⚠️ La IA no respondió: "+String(e.message||e).slice(0,120); }
 }
+function b64e(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function b64d(s){ return decodeURIComponent(escape(atob(String(s).replace(/-/g,"+").replace(/_/g,"/")))); }
+function enlaceLocal(){
+  try{
+    if(!ultimoResultado) return null;
+    const payload={v:3,inputs:snapInputs(),fuentesWeb:ultimoResultado.fuentesWeb||null,preMercado:ultimoResultado.preMercado||null};
+    return location.href.split("#")[0]+"#e="+b64e(JSON.stringify(payload));
+  }catch(e){ return null; }
+}
+function restaurarEnlace(){
+  try{
+    const m=(location.hash||"").match(/#e=([A-Za-z0-9\-_]+)/);
+    if(!m) return false;
+    const j=JSON.parse(b64d(m[1]));
+    if(!j||!j.inputs) return false;
+    ponerInputs(j.inputs);
+    window._web=j.fuentesWeb||null; window._precios=j.preMercado||null;
+    try{ pintarWeb(); pintarPrecios(); }catch(e){}
+    renderFicha(); generarInforme(); go("s3");
+    return true;
+  }catch(e){ return false; }
+}
 async function compartirEstudio(){
   const st=$("shareStatus");
-  let up=null; try{ if(typeof root!=="undefined"&&root.uploadPlugin) up=root.uploadPlugin; }catch(e){}
-  if(!up){ if(st) st.textContent="Compartir requiere conexión y el plugin de subidas."; return; }
   if(!ultimoResultado){ if(st) st.textContent="Primero genere el informe."; return; }
+  let up=null; try{ if(typeof root!=="undefined"&&root.uploadPlugin) up=root.uploadPlugin; }catch(e){}
+  if(!up){ // Fuera de Perchance: enlace con los datos en el hash (sin servidor)
+    const url=enlaceLocal();
+    if(!url){ if(st) st.textContent="⚠️ No se pudo generar el enlace."; return; }
+    try{ if(navigator.clipboard) await navigator.clipboard.writeText(url); }catch(e){}
+    if(st) st.innerHTML="✅ Enlace copiado (los datos viajan en el propio enlace, sin servidor): <a href='"+escH(url)+"' target='_blank' rel='noopener'>abrir estudio</a>";
+    return;
+  }
   if(st) st.textContent="🔗 Subiendo estudio (enlace público, no incluye datos personales)…";
   try{
     const name="facticuba-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
@@ -1483,16 +1538,24 @@ async function buscarPrecios(){
   if(st) st.textContent="🔎 Buscando precios reales de «"+q+"» en Revolico + web…";
   const items=[];
   try{
-    const r=await fetchTexto("https://www.revolico.com/search/?q="+encodeURIComponent(q),15000);
-    if(!r.txt) throw new Error(r.error||"sin respuesta");
-    const t=r.txt, re=/"title":"([^"]{3,90})"[^}]{0,500}?"price":([\d.]+)[^}]{0,200}?"currency":"([A-Z]{3})"/g;
-    let m, n=0;
-    while((m=re.exec(t))&&n<40){
-      n++;
-      const cup=aCUP(m[2],m[3]);
-      if(cup&&cup>0&&cup<50000000) items.push({titulo:m[1],precio:m[2],moneda:m[3],cup:Math.round(cup),fuente:"Revolico",url:"https://www.revolico.com/search/?q="+encodeURIComponent(q)});
-    }
-  }catch(e){ if(st) st.textContent="⚠️ Revolico no respondió: "+String(e.message||e).slice(0,100)+". Pruebe con la investigación web o cambie el producto."; }
+    const ez=await srcRevolicoEspejo(q);
+    ez.forEach(function(x){
+      const cup=aCUP(x.precio,x.moneda);
+      if(cup&&cup>0&&cup<50000000) items.push({titulo:x.titulo,precio:x.precio,moneda:x.moneda,cup:Math.round(cup),fuente:x.fuente,url:x.url});
+    });
+  }catch(e){
+    try{
+      const r=await fetchTexto("https://www.revolico.com/search/?q="+encodeURIComponent(q),15000);
+      if(!r.txt) throw new Error(r.error||"sin respuesta");
+      const t=r.txt, re=/"title":"([^"]{3,90})"[^}]{0,500}?"price":([\d.]+)[^}]{0,200}?"currency":"([A-Z]{3})"/g;
+      let m, n=0;
+      while((m=re.exec(t))&&n<40){
+        n++;
+        const cup=aCUP(m[2],m[3]);
+        if(cup&&cup>0&&cup<50000000) items.push({titulo:m[1],precio:m[2],moneda:m[3],cup:Math.round(cup),fuente:"Revolico",url:"https://www.revolico.com/search/?q="+encodeURIComponent(q)});
+      }
+    }catch(e2){ if(st) st.textContent="⚠️ Revolico no respondió: "+String(e2.message||e2).slice(0,100)+". Pruebe con la investigación web o cambie el producto."; }
+  }
   try{
     const w=window._web;
     if(w&&w.items){
@@ -1921,7 +1984,9 @@ try{
 nacCalc();
 AJ_IDS.forEach(function(id){ if($(id)) $(id).addEventListener("change",function(){ ajSave(); renderFicha(); actualizarCombustible(); actualizarAsistente(); autoRegen(); }); });
 initTerr(); renderFicha(); listarGuardados(); actualizarTasasUI(); actualizarCombustible(); actualizarAsistente(); try{ pintarWeb(); pintarPrecios(); }catch(e){}
-if(typeof navigator!=="undefined"&&navigator.onLine){ sincronizarTasas(false); }
+let desdeEnlace=false; try{ desdeEnlace=restaurarEnlace(); }catch(e){}
+if(desdeEnlace){ const st=$("syncStatus"); if(st) st.textContent="🔗 Estudio cargado desde el enlace (valores del autor). Pulse 📡 para actualizar tasas."; }
+else if(typeof navigator!=="undefined"&&navigator.onLine){ sincronizarTasas(false); }
 else { const st=$("syncStatus"); if(st) st.textContent="⚠️ Sin conexión: valores manuales de referencia. Todo funciona offline."; }
 $("muniSel").onchange=renderFicha; $("provSel").onchange=cargarMun;
 </script>
