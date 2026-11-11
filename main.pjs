@@ -1,0 +1,15 @@
+$meta
+  title = FactiCuba — Estudio de Factibilidad de Negocios en Cuba (Offline)
+  shortTitle = FactiCuba
+  description = App 100% offline para estudios de factibilidad en Cuba: 168 municipios, PDL/MIPYME/TCP/CNA, tributos ONAT, punto de equilibrio, PRI, flujo a 3 años y dictamen automatizado.
+  tags = cuba, factibilidad, mipymes, pdl, tcp, negocios, onat, offline
+
+superFetch = {import:super-fetch-plugin}
+generateText = {import:ai-text-plugin}
+uploadPlugin = {import:upload-plugin}
+
+output
+  [root.facticubaIntro]
+
+facticubaIntro
+  Aplicación de estudio de factibilidad para Cuba. La interfaz completa vive en index.html y funciona sin internet.
