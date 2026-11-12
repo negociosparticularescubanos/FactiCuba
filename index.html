@@ -809,7 +809,7 @@ async function fcApi(action, data) {
   fcSetDb(true);
   return j;
 }
-async function fcPing() { try { const j = await fcApi("ping", {}); if (!j.ok) fcSetDb(false); } catch (e) { fcSetDb(false); } }
+async function fcPing() { try { const j = await fcApi("ping", {}); if (!j.ok) fcSetDb(false); else if (j.registro_abierto === false && typeof fcCerrarRegistro === "function") fcCerrarRegistro(); } catch (e) { fcSetDb(false); } }
 function checkSession() { return !!(FC_SES && FC_SES.token); }
 function applyGate() {
   const locked = !checkSession();
@@ -3335,5 +3335,142 @@ window.addEventListener("load", function () {
     if (prev.foda) { const map = { foF: "f", foO: "o", foD: "d", foA: "a" }; Object.keys(map).forEach(function (id) { const el = document.getElementById(id); if (el) el.value = prev.foda[map[id]] || ""; }); }
   }
   fcDetalle();
+});
+</script>
+
+<script>
+/* ===== ACCESO EXCLUSIVO — la app se cierra tras el dueño =====
+   Cuando el servidor informa registro_abierto:false (ya existe el
+   usuario del dueño), la puerta esconde el registro y lo dice. */
+function fcCerrarRegistro() {
+  const btn = document.querySelector('[onclick="fcModoRegistro()"]');
+  if (btn) btn.hidden = true;
+  const rb = document.getElementById("regBox");
+  if (rb) rb.hidden = true;
+  const card = document.querySelector(".login-card");
+  if (card && !document.getElementById("exclusivoTxt")) {
+    const d = document.createElement("div");
+    d.id = "exclusivoTxt"; d.className = "hint"; d.style.marginTop = "10px";
+    d.textContent = "🔒 App de uso exclusivo de su dueño: el registro está cerrado.";
+    card.appendChild(d);
+  }
+}
+</script>
+
+<style>
+#docOficial{display:none;background:#fff;color:#0f172a;padding:26px;border:1px solid #cbd5e1;border-radius:8px;font-size:13.5px;line-height:1.55}
+#docOficial h1{font-size:20px;margin:0 0 4px}
+#docOficial h2{font-size:15.5px;margin:20px 0 6px;border-bottom:2px solid #0284c7;padding-bottom:3px}
+#docOficial table{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}
+#docOficial td,#docOficial th{border:1px solid #cbd5e1;padding:4px 6px;text-align:left}
+#docOficial .falta{color:#b45309;font-style:italic}
+@media print{
+  body.modo-doc .topbar,body.modo-doc .nav,body.modo-doc .wrap,body.modo-doc #loginGate{display:none !important}
+  body.modo-doc #docOficial{display:block !important;border:none;padding:0}
+}
+</style>
+<script>
+/* ===== FASE 4 — Documento de presentación (estructura oficial) =====
+   Arma el estudio en las 9 partes que pide el proceso inversionista
+   cubano (DL 327 / metodologías MEP) con los datos YA calculados
+   por la app y por las tarjetas de las fases 1-3. Lo que no esté
+   calculado se marca «sin completar» — nunca se inventa. */
+function fcDocConstruir() {
+  if (!ultimoResultado) generarInforme(true);
+  const r = ultimoResultado;
+  const corr = window._correccion, enc = window._encaje, ban = window._bancaria, tra = window._tramites, det = window._detalle;
+  const gv = function (id) { const el = document.getElementById(id); return el ? el.value : ""; };
+  const conv = monInv() === "CUP" ? 1 : tasaActiva(monInv());
+  const falta = function (que) { return "<p class='falta'>Sin completar: " + que + ".</p>"; };
+  const fila = function (a, b) { return "<tr><td>" + a + "</td><td>" + b + "</td></tr>"; };
+  let h = "<h1>Estudio de factibilidad técnico-económica</h1>";
+  h += "<p><b>" + escH(r.nombre || "Sin nombre") + "</b> · " + escH(r.sector || "") + " · " + escH(r.m || "") + ", " + escH(r.p || "") + "<br>Actor: " + escH(r.actor || "") + " (" + escH(r.tam || "") + ") · Fecha del estudio: " + new Date().toLocaleDateString("es") + " · Elaborado con FactiCuba</p>";
+  /* 1 */
+  h += "<h2>1. Resumen ejecutivo y generalidades</h2><table>" +
+    fila("Proyecto", escH(r.nombre || "")) + fila("Forma de gestión", escH(r.actor || "") + " · " + escH(r.tam || "")) +
+    fila("Ubicación", escH(r.m || "") + ", " + escH(r.p || "")) + fila("Sector / actividad", escH(r.sector || "")) +
+    fila("Inversión total", fmt(r.inv) + " CUP") +
+    fila("Indicadores", "VAN " + fmt(r.van || 0) + " CUP · TIR " + (r.tir == null ? "—" : r.tir + "%") + " · PRI " + (r.pri === Infinity || r.pri == null ? "no se recupera" : r.pri + " meses") + " · Margen neto " + Math.round(r.margen || 0) + "%") +
+    fila("Dictamen de factibilidad", "<b>" + escH(r.dict || "") + "</b>") + "</table>";
+  if (corr && corr.escenarios && corr.escenarios.length) h += "<p><b>Ruta a factible calculada:</b> " + corr.escenarios.map(function (e) { return escH(e.titulo) + " (" + e.cambiosTexto.map(escH).join("; ") + ") → " + escH(e.dict); }).join(" | ") + "</p>";
+  /* 2 */
+  h += "<h2>2. Estudio de mercado y comercialización</h2>";
+  if (r.demA) h += "<table>" + fila("Población del municipio (Censo 2022)", fmt(r.demA.pob) + " hab.") + fila("Demanda estimada del sector", fmt(r.demA.total) + " und/mes (local " + fmt(r.demA.local) + " · turismo " + fmt(r.demA.tur) + ")") + fila("Precio del proyecto", fmt(r.precio) + " CUP") + fila("Referencia formal / informal", fmt(r.refFormal || 0) + " / " + fmt(r.refInformal || 0) + " CUP") + fila("Competencia declarada", escH(gv("competencia") || "—")) + "</table>";
+  else h += falta("genera el informe para estimar la demanda");
+  if (enc) h += "<p><b>Encaje territorial:</b> escala " + escH(enc.escala) + " (" + fmt(enc.unidadesProyecto) + " und/mes del proyecto frente a " + fmt(enc.demandaEstimada) + " de demanda estimada)." + (enc.alternativas && enc.alternativas.length ? " Municipios de la provincia con más demanda: " + enc.alternativas.map(function (a) { return escH(a.muni) + " (" + fmt(a.dem) + ")"; }).join(", ") + "." : "") + "</p>";
+  if (r.planComp && r.planComp.origen !== "ninguna") { h += "<p><b>Alineación con el plan de desarrollo municipal:</b> " + escH(r.planComp.nivel || "") + ".</p>" + (r.planComp.checks && r.planComp.checks.length ? "<table>" + r.planComp.checks.map(function (c) { return fila(escH(c.t), c.ok === 1 ? "✅" : c.ok === 0 ? "❌" : "—"); }).join("") + "</table>" : ""); }
+  else h += falta("carga el plan de desarrollo municipal en el Paso 2 para puntuar la alineación");
+  if (det && det.foda && (det.foda.f || det.foda.o || det.foda.d || det.foda.a)) h += "<table>" + fila("Fortalezas", escH(det.foda.f)) + fila("Oportunidades", escH(det.foda.o)) + fila("Debilidades", escH(det.foda.d)) + fila("Amenazas", escH(det.foda.a)) + "</table>";
+  /* 3 */
+  h += "<h2>3. Estudio técnico y de ingeniería</h2><table>" +
+    fila("Capacidad instalada", fmt(r.cap) + " und/mes · ocupación prevista " + Math.round(r.ocup || 0) + "% → " + fmt(Math.round(r.und || 0)) + " und/mes") +
+    fila("Inversión en local / obra", fmt(Math.round(val("invLocal") * conv)) + " CUP") +
+    fila("Inversión en equipos", fmt(Math.round(val("invEquipos") * conv)) + " CUP") +
+    fila("Capital de trabajo inicial", fmt(Math.round(val("invCapital") * conv)) + " CUP") +
+    fila("Combustible y energía (costo fijo)", fmt(r.combTot || 0) + " CUP/mes") + "</table>";
+  if (det && det.equipos && det.equipos.length) h += "<table><tr><th>Equipo</th><th>Costo</th><th>Vida útil</th><th>Origen</th></tr>" + det.equipos.map(function (e) { return "<tr><td>" + escH(e.nombre) + "</td><td>" + fmt(e.costo) + "</td><td>" + e.vida + " años</td><td>" + escH(e.origen) + "</td></tr>"; }).join("") + "</table>";
+  else h += falta("detalla el equipamiento en la tarjeta «Detalle del expediente»");
+  /* 4 */
+  h += "<h2>4. Estudio organizacional y de recursos humanos</h2><table>" +
+    fila("Trabajadores", fmt(val("numTrab")) + " · salario medio " + fmt(val("salMedio")) + " CUP · socios " + fmt(val("numSocios"))) +
+    fila("Nómina mensual", fmt(r.nomina || 0) + " CUP") + fila("Tributos sobre la nómina", fmt(r.tribNom || 0) + " CUP/mes") +
+    fila("Cuota de socios", fmt(r.cuotaSocios || 0) + " CUP/mes") + "</table>";
+  if (det && det.plantillaTotal > 0) h += "<p>Plantilla por categorías: directivos " + det.plantilla.dir + " · técnicos " + det.plantilla.tec + " · operarios " + det.plantilla.ope + " · administrativos " + det.plantilla.adm + " · servicios " + det.plantilla.ser + " (total " + det.plantillaTotal + ").</p>";
+  /* 5 */
+  h += "<h2>5. Marco legal, regulatorio y ambiental</h2>";
+  if (tra) {
+    const estTxt = { listo: "✅ Listo", tramite: "🕐 En trámite", pendiente: "⬜ Pendiente", na: "➖ No aplica" };
+    h += "<table>" + TRAM_ITEMS.map(function (it) { return fila(escH(it[1]), estTxt[tra.items[it[0]]] || "—"); }).join("") + "</table>";
+    h += "<p><b>Veredicto de presentabilidad:</b> " + escH(tra.veredicto) + (tra.bloqueos.length ? " — Bloqueantes: " + tra.bloqueos.map(escH).join("; ") : "") + "</p>";
+    if (tra.mitigacion) h += "<p><b>Mitigación ambiental:</b> " + escH(tra.mitigacion) + "</p>";
+  } else h += falta("marca el estado de los trámites en la tarjeta «Trámites, ambiente y cronograma»");
+  /* 6 */
+  h += "<h2>6. Cronograma de ejecución</h2>";
+  if (tra && tra.cronograma) {
+    h += "<table>" + TRAM_CRON.map(function (c) { return fila(escH(c[1]), (tra.cronograma[c[0]] || 0) + " mes(es)"); }).join("") + fila("<b>Total hasta el inicio de explotación</b>", "<b>" + tra.totalMeses + " meses</b>") + "</table>";
+  } else h += falta("define las duraciones en la tarjeta de trámites y cronograma");
+  /* 7 */
+  h += "<h2>7. Estudio económico-financiero</h2><table>" +
+    fila("Ingresos mensuales", fmt(r.ingresos || 0) + " CUP") + fila("Costos variables", fmt(r.cvTot || 0) + " CUP") +
+    fila("Costos fijos (incl. nómina y tributos de nómina)", fmt(r.CF || 0) + " CUP") +
+    fila("Impuesto sobre ventas/servicios", fmt(r.impVentasMes || 0) + " CUP") +
+    fila("Utilidad bruta", fmt(r.utilBruta || 0) + " CUP") + fila("Impuesto sobre utilidades", fmt(r.impUtilMes || 0) + " CUP") +
+    fila("<b>Utilidad neta mensual</b>", "<b>" + fmt(r.utilNeta || 0) + " CUP</b>") +
+    fila("Punto de equilibrio", (r.peUnd === Infinity || r.peUnd == null ? "no alcanzado" : fmt(Math.round(r.peUnd)) + " und/mes")) + "</table>";
+  if (ban && ban.config) {
+    if (ban.config.monto > 0) { h += "<p><b>Financiamiento con crédito:</b> " + fmt(ban.config.monto) + " CUP al " + ban.config.tasa + "% anual, " + ban.config.plazo + " meses" + (ban.config.gracia ? ", " + ban.config.gracia + " de gracia" : "") + ". Cuota: " + fmt(ban.cuota) + " CUP/mes · DSCR mínimo " + (ban.dscrMin == null ? "—" : ban.dscrMin) + ".</p>" + (ban.anios && ban.anios.length ? "<table><tr><th>Año</th><th>Capital</th><th>Intereses</th><th>Servicio</th><th>Saldo</th></tr>" + ban.anios.map(function (a) { return "<tr><td>" + a.anio + "</td><td>" + fmt(a.capital) + "</td><td>" + fmt(a.intereses) + "</td><td>" + fmt(a.servicio) + "</td><td>" + fmt(a.saldo) + "</td></tr>"; }).join("") + "</table>" : ""); }
+    h += "<p>Relación Beneficio/Costo (año estabilizado): <b>" + (ban.bc == null ? "—" : ban.bc) + "</b> · Depreciación lineal: " + fmt(ban.depMes) + " CUP/mes.</p>";
+  } else h += falta("calcula la evaluación bancaria si el proyecto pide crédito");
+  /* 8 */
+  h += "<h2>8. Evaluación financiera, riesgos y sensibilidad</h2><table>" +
+    fila("VAN", fmt(r.van || 0) + " CUP") + fila("TIR", (r.tir == null ? "—" : r.tir + "%")) +
+    fila("PRI", (r.pri === Infinity || r.pri == null ? "no se recupera" : r.pri + " meses")) +
+    fila("Riesgo total", Math.round(r.riesgo || 0) + "/100") +
+    fila("Puntuaciones", "demanda " + Math.round(r.demScore || 0) + " · operación " + Math.round(r.opScore || 0) + " · finanzas " + Math.round(r.finScore || 0) + " · confianza de datos " + Math.round(r.conf || 0) + "%") + "</table>";
+  if (r.motivos && r.motivos.length) h += "<p><b>Motivos del dictamen:</b></p><ul>" + r.motivos.map(function (m) { return "<li>" + escH(String(m)) + "</li>"; }).join("") + "</ul>";
+  if (r.conds && r.conds.length) h += "<p><b>Condiciones:</b></p><ul>" + r.conds.map(function (m) { return "<li>" + escH(String(m)) + "</li>"; }).join("") + "</ul>";
+  /* 9 */
+  h += "<h2>9. Anexos y respaldo documental</h2>";
+  if (det && det.anexos && det.anexos.length) h += "<table>" + det.anexos.map(function (a) { return fila(escH(a.tipo) + " — " + escH(a.nombre), a.estado === "listo" ? "✅ Listo" : "⬜ Pendiente"); }).join("") + "</table>";
+  else h += falta("registra los anexos en la tarjeta «Detalle del expediente»");
+  h += "<p>Fuentes del estudio: datos territoriales del Censo 2022 (ONEI) incorporados en la app; tasas BCC/elToque sincronizadas en la app; " + ((r.fuentesWeb && r.fuentesWeb.items && r.fuentesWeb.items.length) ? r.fuentesWeb.items.length + " fuente(s) web consultada(s) desde la app." : "sin fuentes web adicionales.") + "</p>";
+  h += "<p style='margin-top:16px;font-size:12px'>Documento generado por FactiCuba a partir de los datos introducidos por el promotor. Verifique las cifras y los trámites antes de presentarlo ante el organismo aprobador o el banco.</p>";
+  const box = document.getElementById("docOficial");
+  if (box) { box.innerHTML = h; box.style.display = "block"; }
+  return h;
+}
+function fcDocOficial() {
+  fcDocConstruir();
+  document.body.classList.add("modo-doc");
+  setTimeout(function () { window.print(); }, 60);
+}
+window.addEventListener("afterprint", function () { document.body.classList.remove("modo-doc"); });
+window.addEventListener("load", function () {
+  const ancla = document.getElementById("detCard") || document.getElementById("tramCard") || document.getElementById("informeBox");
+  if (ancla && !document.getElementById("docCard")) {
+    ancla.insertAdjacentHTML("afterend", "<div class='card no-print' id='docCard'><h3>📄 Documento de presentación</h3><div class='btnrow'><button class='btn btn-p' onclick='fcDocOficial()'>Generar el documento oficial (9 partes)</button><button class='btn btn-d' onclick='fcDocConstruir()'>Solo previsualizar</button></div><div class='hint'>Arma el estudio con la estructura que pide el proceso inversionista (resumen, mercado, técnico, organización, legal-ambiental, cronograma, económico-financiero, evaluación y anexos) con todo lo calculado en las tarjetas anteriores. Lo que falte queda marcado «sin completar», nunca inventado.</div></div><div id='docOficial'></div>");
+    const dc = document.getElementById("docCard"), doc = document.getElementById("docOficial");
+    if (dc && doc && dc.nextSibling !== doc) dc.after(doc);
+  }
 });
 </script>
