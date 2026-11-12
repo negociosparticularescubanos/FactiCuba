@@ -2820,7 +2820,7 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     try {
       const arr = leerLS(), st = arr[0];
       if (st && checkSession()) {
-        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen } })
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null } })
           .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
       }
     } catch (e) {}
@@ -2840,4 +2840,125 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     _cg(i);
   };
 })();
+</script>
+
+<script>
+/* ===== FASE 1 — Simulador de corrección: la ruta a FACTIBLE =====
+   Mueve las palancas del estudio (precio, costo variable, fijos,
+   ocupación, capacidad, inversión) y reevalúa con el MOTOR REAL de la
+   app (generarInforme + ultimoResultado), así que ningún número sale
+   de una cuenta paralela. Al terminar restaura el estudio tal cual. */
+window._correccion = null;
+function fcNivel(r) { return r ? (r.dictCls === "ok" ? 2 : r.dictCls === "warn" ? 1 : 0) : 0; }
+function fcEvalua(cambios) {
+  Object.keys(cambios).forEach(function (id) { const el = document.getElementById(id); if (el) el.value = cambios[id]; });
+  generarInforme(true);
+  return ultimoResultado;
+}
+function fcEscenario(titulo, e) {
+  const r = e.r;
+  return { titulo: titulo, cambiosTexto: e.etiquetas, cambios: e.cambios, nivel: e.nivel, dict: r.dict,
+    util: Math.round(r.utilNeta), margen: Math.round(r.margen * 10) / 10,
+    pri: (r.pri === Infinity || r.pri == null) ? null : Math.round(r.pri * 10) / 10,
+    van: (r.van === Infinity || r.van == null) ? null : Math.round(r.van),
+    motivos: r.motivos || [] };
+}
+function fcBuscarCorreccion() {
+  if (!ultimoResultado) generarInforme(true);
+  const base = ultimoResultado, snap0 = snapInputs();
+  const salida = { fecha: new Date().toISOString(), dictamenBase: base.dict, nivelBase: fcNivel(base), motivos: base.motivos || [], escenarios: [] };
+  if (fcNivel(base) === 2) { window._correccion = salida; fcPintarCorreccion(salida); ponerInputs(snap0); generarInforme(true); return salida; }
+  const num = function (id) { return Number(snap0[id]) || 0; };
+  const precio0 = num("precio"), cvu0 = num("cvu"), ocup0 = num("ocupacion"), cap0 = num("capacidad");
+  const fijosIds = ["fijoAlquiler", "fijoEnergia", "fijoConect", "fijoOtros"];
+  const invIds = ["invLocal", "invEquipos", "invCapital"];
+  const techoPrecio = num("refInformal") > precio0 ? num("refInformal") : Math.round(precio0 * 1.65);
+  const C = [];
+  const add = function (etiqueta, cambios, esfuerzo) { C.push({ etiquetas: [etiqueta], cambios: cambios, esfuerzo: esfuerzo }); };
+  [1.10, 1.20, 1.35, 1.50, 1.65].forEach(function (f) { const p1 = Math.round(precio0 * f); if (p1 > precio0 && p1 <= techoPrecio) add("Subir el precio a " + fmt(p1) + " CUP (+" + Math.round((f - 1) * 100) + "%)", { precio: p1 }, f - 1); });
+  [0.90, 0.80, 0.70, 0.60, 0.55].forEach(function (f) { if (cvu0 > 0) add("Bajar el costo variable unitario a " + fmt(Math.round(cvu0 * f)) + " CUP (−" + Math.round((1 - f) * 100) + "%)", { cvu: Math.round(cvu0 * f) }, (1 - f) * 1.2); });
+  [0.90, 0.80, 0.70, 0.60].forEach(function (f) { const c = {}; let hay = false; fijosIds.forEach(function (id) { if (num(id) > 0) { c[id] = Math.round(num(id) * f); hay = true; } }); if (hay) add("Recortar los costos fijos un " + Math.round((1 - f) * 100) + "%", c, (1 - f) * 1.1); });
+  [10, 20, 30].forEach(function (d) { const o1 = Math.min(95, ocup0 + d); if (o1 > ocup0) add("Subir la ocupación al " + o1 + "% (captar más demanda)", { ocupacion: o1 }, d / 100 * 0.8); });
+  [1.25, 1.50].forEach(function (f) { if (cap0 > 0) add("Ampliar la capacidad a " + fmt(Math.round(cap0 * f)) + " unidades/mes", { capacidad: Math.round(cap0 * f) }, (f - 1) * 1.3); });
+  [0.85, 0.70, 0.55].forEach(function (f) { const c = {}; let hay = false; invIds.forEach(function (id) { if (num(id) > 0) { c[id] = Math.round(num(id) * f); hay = true; } }); if (hay) add("Reducir o fasear la inversión (−" + Math.round((1 - f) * 100) + "%)", c, (1 - f)); });
+  [1, 2].forEach(function (d) { const t0 = num("numTrab"); if (t0 - d >= 0 && t0 > 0) add("Operar con " + d + " trabajador(es) menos (" + (t0 - d) + " en plantilla)", { numTrab: t0 - d }, d * 0.35); });
+  const combos = [];
+  const combo = function (nombre, esp, cvf, fjf, ocD, invf, capf) {
+    const c = {}, et = [];
+    const p1 = Math.min(techoPrecio, Math.round(precio0 * esp)); if (p1 > precio0) { c.precio = p1; et.push("precio a " + fmt(p1) + " CUP"); }
+    if (cvu0 > 0) { c.cvu = Math.round(cvu0 * cvf); et.push("costo variable a " + fmt(c.cvu) + " CUP"); }
+    const cf = {}; let hayF = false; fijosIds.forEach(function (id) { if (num(id) > 0) { cf[id] = Math.round(num(id) * fjf); hayF = true; } });
+    if (hayF) { Object.assign(c, cf); et.push("fijos −" + Math.round((1 - fjf) * 100) + "%"); }
+    const o1 = Math.min(95, ocup0 + ocD); if (o1 > ocup0) { c.ocupacion = o1; et.push("ocupación al " + o1 + "%"); }
+    const ci = {}; let hayI = false; invIds.forEach(function (id) { if (num(id) > 0) { ci[id] = Math.round(num(id) * invf); hayI = true; } });
+    if (hayI) { Object.assign(c, ci); et.push("inversión −" + Math.round((1 - invf) * 100) + "% (por fases)"); }
+    if (capf && cap0 > 0) { c.capacidad = Math.round(cap0 * capf); et.push("capacidad ×" + capf); }
+    if (et.length) combos.push({ etiquetas: [nombre + ": " + et.join(" · ")], cambios: c, esfuerzo: 0.9 });
+  };
+  combo("Combinado moderado", 1.20, 0.85, 0.90, 15, 0.85, 0);
+  combo("Combinado fuerte", 1.35, 0.75, 0.80, 25, 0.70, 1.25);
+  combo("Máximo esfuerzo", 1.65, 0.55, 0.60, 40, 0.50, 1.50);
+  const palancasIds = ["precio", "cvu", "fijoAlquiler", "fijoEnergia", "fijoConect", "fijoOtros", "ocupacion", "capacidad", "invLocal", "invEquipos", "invCapital", "numTrab"];
+  const resetPalancas = function () { palancasIds.forEach(function (id) { const el = document.getElementById(id); if (el && snap0[id] !== undefined) el.value = snap0[id]; }); };
+  const todos = C.concat(combos).map(function (c) { resetPalancas(); const r = fcEvalua(c.cambios); return { etiquetas: c.etiquetas, cambios: c.cambios, esfuerzo: c.esfuerzo, nivel: fcNivel(r), r: r }; });
+  ponerInputs(snap0); generarInforme(true);
+  const verdes = todos.filter(function (e) { return e.nivel === 2; }).sort(function (a, b) { return a.esfuerzo - b.esfuerzo; });
+  const amarillos = todos.filter(function (e) { return e.nivel === 1; }).sort(function (a, b) { return (b.r.utilNeta - a.r.utilNeta) || (a.esfuerzo - b.esfuerzo); });
+  if (verdes.length) {
+    salida.escenarios.push(fcEscenario("✅ Ruta a factible — ajuste mínimo", verdes[0]));
+    const alt = verdes.find(function (e) { return e !== verdes[0]; });
+    if (alt) salida.escenarios.push(fcEscenario("✅ Ruta alternativa", alt));
+  } else if (amarillos.length) {
+    salida.escenarios.push(fcEscenario("🟡 Lo más cerca que se llega (aún con cambios)", amarillos[0]));
+  }
+  window._correccion = salida;
+  fcPintarCorreccion(salida);
+  return salida;
+}
+function fcAplicarCorreccion(i) {
+  const esc = window._correccion && window._correccion.escenarios[i];
+  if (!esc) return;
+  const snap = Object.assign({}, snapInputs(), esc.cambios);
+  ponerInputs(snap);
+  Object.keys(esc.cambios).forEach(function (id) { const el = document.getElementById(id); if (el) el.value = esc.cambios[id]; });
+  generarInforme(true); go("s3");
+  const box = document.getElementById("corrBox");
+  if (box) box.insertAdjacentHTML("afterbegin", "<div class='alert ok'>Escenario aplicado al formulario: <b>" + escH(esc.titulo) + "</b>. Revisa los valores y guarda el estudio para que quede en la base con su ruta de corrección.</div>");
+}
+function fcPintarCorreccion(salida) {
+  let box = document.getElementById("corrBox");
+  if (!box) {
+    const ib = document.getElementById("informeBox");
+    if (!ib) return;
+    ib.insertAdjacentHTML("afterend", "<div class='card no-print' id='corrCard'><h3>🔧 Ruta a factible</h3><div id='corrBox'></div></div>");
+    box = document.getElementById("corrBox");
+  }
+  if (salida.nivelBase === 2) {
+    box.innerHTML = "<div class='alert ok'>Este estudio ya sale <b>🟢 SÍ VALE LA PENA</b> con los valores actuales: no necesita corrección. Si quieres, sube el precio o la ocupación en el formulario y vuelve a generar para buscar más margen.</div>";
+    return;
+  }
+  let h = "<div class='alert bad'>Diagnóstico: <b>" + escH(salida.dictamenBase) + "</b></div>";
+  if (salida.motivos && salida.motivos.length) h += "<p style='margin:8px 0'><b>Por qué no es factible hoy:</b></p><ul class='list'>" + salida.motivos.map(function (m) { return "<li>" + escH(String(m)) + "</li>"; }).join("") + "</ul>";
+  if (!salida.escenarios.length) {
+    h += "<div class='alert warn'>Probé todas las palancas (precio, costo variable, fijos, ocupación, capacidad e inversión, solas y combinadas) y <b>ninguna lleva el estudio a factible</b> con este negocio en este municipio. Lo que queda es estructural: cambiar de actividad o de escala, buscar otro municipio con mejor demanda, o apoyarse en el plan de desarrollo local (Fase 2 del plan de mejoras).</div>";
+  }
+  salida.escenarios.forEach(function (e, i) {
+    h += "<div class='s'><b>" + escH(e.titulo) + "</b><ul class='list'>" + e.cambiosTexto.map(function (t) { return "<li>" + escH(t) + "</li>"; }).join("") + "</ul>" +
+      "<span style='font-size:13px'>Resultado: <b>" + escH(e.dict) + "</b> · Utilidad " + fmt(e.util) + " CUP/mes · Margen " + e.margen + "% · PRI " + (e.pri == null ? "—" : e.pri + " meses") + (e.van == null ? "" : " · VAN " + fmt(e.van) + " CUP") + "</span>" +
+      "<div class='btnrow'><button class='btn btn-p' onclick='fcAplicarCorreccion(" + i + ")'>Aplicar este escenario</button></div></div>";
+    if (e.nivel === 1 && e.motivos && e.motivos.length) h += "<p style='font-size:13px'><b>Aún quedaría por resolver:</b> " + e.motivos.map(function (m) { return escH(String(m)); }).join(" · ") + "</p>";
+  });
+  box.innerHTML = h;
+}
+window.addEventListener("load", function () {
+  const ib = document.getElementById("informeBox");
+  if (ib && !document.getElementById("corrCard")) {
+    ib.insertAdjacentHTML("afterend", "<div class='card no-print' id='corrCard'><h3>🔧 Ruta a factible</h3><div class='btnrow'><button class='btn btn-p' onclick='fcCorreccionClick()'>Buscar cómo hacerlo factible</button></div><div id='corrBox'><div class='hint'>Si el dictamen no es verde, el simulador prueba las palancas del estudio con el motor real y te dice qué mover — y cuánto — para que el proyecto sea factible.</div></div></div>");
+  }
+});
+function fcCorreccionClick() {
+  const box = document.getElementById("corrBox");
+  if (box) box.innerHTML = "<div class='alert warn'>Probando palancas con el motor real del estudio…</div>";
+  setTimeout(function () { fcBuscarCorreccion(); }, 30);
+}
 </script>
