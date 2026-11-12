@@ -2820,7 +2820,7 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     try {
       const arr = leerLS(), st = arr[0];
       if (st && checkSession()) {
-        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null, bancaria: window._bancaria || null } })
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null, bancaria: window._bancaria || null, tramites: window._tramites || null, detalle: window._detalle || null } })
           .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
       }
     } catch (e) {}
@@ -3148,5 +3148,192 @@ window.addEventListener("load", function () {
       "</div><div class='btnrow'><button class='btn btn-p' onclick='fcBancaria()'>Calcular evaluación bancaria</button></div>" +
       "<div id='banBox'><div class='hint'>La tabla de amortización con gracia, la cobertura de la deuda (DSCR), la relación Beneficio/Costo y la depreciación: lo que el banco mira antes de aprobar un crédito.</div></div></div>");
   }
+});
+</script>
+
+<script>
+/* ===== FASE 3B — Trámites, ambiente y cronograma (DL 327) =====
+   Checklist legal-ambiental con estados y veredicto de
+   PRESENTABILIDAD (separado del dictamen financiero: un proyecto
+   puede ser rentable y aun así no poder presentarse), más el
+   cronograma del proceso inversionista con ruta secuencial. */
+window._tramites = null;
+const TRAM_ITEMS = [
+  ["terr", "Compatibilidad con el ordenamiento territorial y microlocalización (Planificación Física)", 1],
+  ["objeto", "Objeto social / actividad autorizada para este actor económico", 1],
+  ["registro", "Inscripción del actor: Registro Mercantil (MIPYME), aprobación del CAM (PDL) o licencia vigente (TCP)", 1],
+  ["sanitaria", "Licencia sanitaria (si la actividad la exige)", 0],
+  ["apci", "Aval de Protección Contra Incendios (APCI)", 0],
+  ["banco", "Cuenta bancaria operativa y, si hay crédito, contrato firmado con el banco", 0],
+  ["ambiental", "Licencia Ambiental del CITMA (si la actividad la requiere)", 0],
+  ["desechos", "Manejo de desechos sólidos, residuales líquidos y emisiones definido, con medidas de mitigación", 0]
+];
+const TRAM_CRON = [
+  ["tramites", "Trámites y licencias", 2],
+  ["contratacion", "Contratación y financiamiento", 1],
+  ["obra", "Obra civil / adecuación del local", 3],
+  ["equipos", "Adquisición e importación de equipamiento", 2],
+  ["montaje", "Montaje e instalación", 1],
+  ["pruebas", "Pruebas y puesta en marcha", 1]
+];
+function fcTramites() {
+  const items = {}, bloqueos = [], conds = [];
+  document.querySelectorAll(".tramSel").forEach(function (sel) {
+    const k = sel.dataset.k, est = sel.value; items[k] = est;
+    const def = TRAM_ITEMS.find(function (x) { return x[0] === k; });
+    if (!def) return;
+    if (est === "pendiente") { (def[2] ? bloqueos : conds).push(def[1]); }
+    else if (est === "tramite") { conds.push(def[1] + " (en trámite)"); }
+  });
+  const cron = {}; let total = 0;
+  document.querySelectorAll(".cronInp").forEach(function (inp) { const v = Math.max(0, parseFloat(inp.value) || 0); cron[inp.dataset.k] = v; total += v; });
+  let veredicto, clase;
+  if (bloqueos.length) { veredicto = "⛔ NO PRESENTABLE todavía"; clase = "bad"; }
+  else if (conds.length) { veredicto = "🟡 PRESENTABLE CONDICIONADO"; clase = "warn"; }
+  else { veredicto = "✅ SIN BLOQUEOS LEGALES"; clase = "ok"; }
+  const mit = (document.getElementById("tramMitiga") || {}).value || "";
+  const salida = { fecha: new Date().toISOString(), items: items, bloqueos: bloqueos, condicionantes: conds, veredicto: veredicto, cronograma: cron, totalMeses: total, mitigacion: mit };
+  window._tramites = salida;
+  try { localStorage.setItem("facticuba_tramites_v1", JSON.stringify(salida)); } catch (e) {}
+  const box = document.getElementById("tramBox"); if (!box) return salida;
+  const d = new Date(); d.setMonth(d.getMonth() + total);
+  const arranque = total > 0 ? d.toLocaleDateString("es", { month: "long", year: "numeric" }) : "—";
+  let h = "<div class='alert " + clase + "'><b>" + veredicto + "</b></div>";
+  if (bloqueos.length) h += "<p style='margin:6px 0'><b>Bloqueantes pendientes:</b></p><ul class='list'>" + bloqueos.map(function (t) { return "<li>" + escH(t) + "</li>"; }).join("") + "</ul>";
+  if (conds.length) h += "<p style='margin:6px 0'><b>Condicionantes:</b></p><ul class='list'>" + conds.map(function (t) { return "<li>" + escH(t) + "</li>"; }).join("") + "</ul>";
+  h += "<p style='margin:8px 0 4px'><b>Cronograma del proceso inversionista</b> (secuencial): total <b>" + total + " meses</b> · inicio de explotación estimado: <b>" + arranque + "</b></p>";
+  h += TRAM_CRON.map(function (c) {
+    const v = cron[c[0]] || 0, pct = total > 0 ? Math.round(v / total * 100) : 0;
+    return "<div style='font-size:13px;margin:3px 0'><span style='display:inline-block;width:46%'>" + escH(c[1]) + "</span><span style='display:inline-block;height:10px;background:#0284c7;border-radius:3px;width:" + Math.max(2, pct * 0.4) + "%'></span> " + v + " mes(es)</div>";
+  }).join("");
+  box.innerHTML = h;
+  return salida;
+}
+window.addEventListener("load", function () {
+  const ancla = document.getElementById("banCard") || document.getElementById("encCard") || document.getElementById("informeBox");
+  if (!ancla || document.getElementById("tramCard")) return;
+  const opts = "<option value='pendiente'>⬜ Pendiente</option><option value='tramite'>🕐 En trámite</option><option value='listo'>✅ Listo</option><option value='na'>➖ No aplica</option>";
+  let h = "<div class='card no-print' id='tramCard'><h3>📋 Trámites, ambiente y cronograma</h3>";
+  h += TRAM_ITEMS.map(function (it) {
+    return "<div style='display:flex;gap:8px;align-items:center;margin:5px 0'><span style='flex:1;font-size:13px'>" + escH(it[1]) + (it[2] ? " <b>(bloqueante)</b>" : "") + "</span><select class='tramSel' data-k='" + it[0] + "' onchange='fcTramites()'>" + opts + "</select></div>";
+  }).join("");
+  h += "<div style='margin-top:8px'><label class='f' for='tramMitiga'>Medidas de mitigación ambiental (desechos, residuales, emisiones, ruido)</label><textarea id='tramMitiga' rows='2' style='width:100%' oninput='fcTramites()' placeholder='Ej.: residuales a la red con trampa de grasa; desechos sólidos contratados con Servicios Comunales…'></textarea></div>";
+  h += "<p style='margin:10px 0 4px'><b>Duración por fase (meses):</b></p><div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px'>";
+  h += TRAM_CRON.map(function (c) {
+    return "<div><label class='f'>" + escH(c[1]) + "</label><input type='number' class='cronInp' data-k='" + c[0] + "' min='0' step='1' value='" + c[2] + "' oninput='fcTramites()'></div>";
+  }).join("");
+  h += "</div><div id='tramBox' style='margin-top:10px'></div></div>";
+  ancla.insertAdjacentHTML("afterend", h);
+  try {
+    const prev = JSON.parse(localStorage.getItem("facticuba_tramites_v1") || "null");
+    if (prev) {
+      document.querySelectorAll(".tramSel").forEach(function (sel) { if (prev.items && prev.items[sel.dataset.k]) sel.value = prev.items[sel.dataset.k]; });
+      document.querySelectorAll(".cronInp").forEach(function (inp) { if (prev.cronograma && prev.cronograma[inp.dataset.k] != null) inp.value = prev.cronograma[inp.dataset.k]; });
+      const tm = document.getElementById("tramMitiga"); if (tm && prev.mitigacion) tm.value = prev.mitigacion;
+    }
+  } catch (e) {}
+  fcTramites();
+});
+</script>
+
+<script>
+/* ===== FASE 3C — Detalle del expediente =====
+   Equipamiento itemizado (con su depreciación y contraste contra
+   el invEquipos del formulario), plantilla por categorías (contra
+   el numTrab del formulario), FODA y registro de anexos con
+   respaldo documental. Todo viaja en el payload del estudio. */
+window._detalle = null;
+function fcEqAdd(datos) {
+  const tb = document.getElementById("eqBody"); if (!tb) return;
+  const tr = document.createElement("tr");
+  tr.innerHTML = "<td><input type='text' class='eqNom' style='width:100%' placeholder='Equipo / herramienta'></td>" +
+    "<td><input type='number' class='eqCosto' min='0' step='100' style='width:110px'></td>" +
+    "<td><input type='number' class='eqVida' min='1' step='1' value='8' style='width:64px'></td>" +
+    "<td><select class='eqOrg'><option value='nacional'>Nacional</option><option value='importado'>Importado</option></select></td>" +
+    "<td><button class='btn btn-d' type='button' onclick='this.closest(\"tr\").remove(); fcDetalle();'>×</button></td>";
+  tb.appendChild(tr);
+  if (datos) {
+    tr.querySelector(".eqNom").value = datos.nombre || "";
+    tr.querySelector(".eqCosto").value = datos.costo || "";
+    tr.querySelector(".eqVida").value = datos.vida || 8;
+    tr.querySelector(".eqOrg").value = datos.origen || "nacional";
+  }
+  tr.querySelectorAll("input,select").forEach(function (el) { el.addEventListener("input", fcDetalle); el.addEventListener("change", fcDetalle); });
+}
+function fcAnAdd(datos) {
+  const tb = document.getElementById("anBody"); if (!tb) return;
+  const tr = document.createElement("tr");
+  tr.innerHTML = "<td><select class='anTipo'><option>Cotización / proforma</option><option>Carta de intención</option><option>Precontrato</option><option>Plano / esquema</option><option>Ficha técnica</option><option>Estado financiero</option><option>Otro respaldo</option></select></td>" +
+    "<td><input type='text' class='anNom' style='width:100%' placeholder='Descripción'></td>" +
+    "<td><select class='anEst'><option value='listo'>✅ Listo</option><option value='pendiente'>⬜ Pendiente</option></select></td>" +
+    "<td><button class='btn btn-d' type='button' onclick='this.closest(\"tr\").remove(); fcDetalle();'>×</button></td>";
+  tb.appendChild(tr);
+  if (datos) {
+    tr.querySelector(".anTipo").value = datos.tipo || "Cotización / proforma";
+    tr.querySelector(".anNom").value = datos.nombre || "";
+    tr.querySelector(".anEst").value = datos.estado || "pendiente";
+  }
+  tr.querySelectorAll("input,select").forEach(function (el) { el.addEventListener("input", fcDetalle); el.addEventListener("change", fcDetalle); });
+}
+function fcDetalle() {
+  const conv = monInv() === "CUP" ? 1 : tasaActiva(monInv());
+  const equipos = []; let totalEq = 0, depEqMes = 0;
+  document.querySelectorAll("#eqBody tr").forEach(function (tr) {
+    const nombre = tr.querySelector(".eqNom").value.trim();
+    const costo = parseFloat(tr.querySelector(".eqCosto").value) || 0;
+    const vida = Math.max(1, parseFloat(tr.querySelector(".eqVida").value) || 8);
+    const origen = tr.querySelector(".eqOrg").value;
+    if (nombre || costo > 0) { equipos.push({ nombre: nombre, costo: costo, vida: vida, origen: origen }); totalEq += costo; depEqMes += (costo * conv) / (vida * 12); }
+  });
+  const pl = {};
+  ["dir", "tec", "ope", "adm", "ser"].forEach(function (k) { const el = document.getElementById("pl_" + k); pl[k] = el ? Math.max(0, parseInt(el.value) || 0) : 0; });
+  const plTotal = pl.dir + pl.tec + pl.ope + pl.adm + pl.ser;
+  const foda = { f: (document.getElementById("foF") || {}).value || "", o: (document.getElementById("foO") || {}).value || "", d: (document.getElementById("foD") || {}).value || "", a: (document.getElementById("foA") || {}).value || "" };
+  const anexos = [];
+  document.querySelectorAll("#anBody tr").forEach(function (tr) {
+    anexos.push({ tipo: tr.querySelector(".anTipo").value, nombre: tr.querySelector(".anNom").value.trim(), estado: tr.querySelector(".anEst").value });
+  });
+  const salida = { fecha: new Date().toISOString(), equipos: equipos, totalEquipos: Math.round(totalEq), depEquiposMes: Math.round(depEqMes), plantilla: pl, plantillaTotal: plTotal, foda: foda, anexos: anexos };
+  window._detalle = salida;
+  try { localStorage.setItem("facticuba_detalle_v1", JSON.stringify(salida)); } catch (e) {}
+  const box = document.getElementById("detBox"); if (!box) return salida;
+  const invEqForm = val("invEquipos");
+  let h = "";
+  if (equipos.length) {
+    const dif = invEqForm > 0 ? (totalEq - invEqForm) / invEqForm * 100 : 0;
+    h += "<p style='margin:4px 0'>Equipamiento detallado: <b>" + fmt(totalEq) + "</b> (en la moneda del formulario) · depreciación del detalle: <b>" + fmt(Math.round(depEqMes)) + " CUP/mes</b>.</p>";
+    if (invEqForm > 0 && Math.abs(dif) > 5) h += "<div class='alert warn'>El detalle suma " + fmt(totalEq) + " pero el formulario declara " + fmt(invEqForm) + " en equipos (" + (dif > 0 ? "+" : "") + Math.round(dif) + "%): ajusta uno de los dos para que el expediente cuadre.</div>";
+    else if (invEqForm > 0) h += "<div class='alert ok'>El detalle de equipos cuadra con el formulario (diferencia " + Math.round(dif) + "%).</div>";
+  }
+  const nTrab = val("numTrab");
+  if (plTotal > 0 && nTrab > 0 && plTotal !== nTrab) h += "<div class='alert warn'>La plantilla por categorías suma " + plTotal + " pero el formulario declara " + nTrab + " trabajadores: hazlos coincidir.</div>";
+  if (plTotal > 0 && plTotal === nTrab) h += "<div class='alert ok'>Plantilla por categorías: " + plTotal + " trabajadores, coincide con el formulario.</div>";
+  const listos = anexos.filter(function (a) { return a.estado === "listo"; }).length;
+  if (anexos.length) h += "<p style='margin:4px 0'>Respaldo documental: <b>" + listos + " de " + anexos.length + "</b> anexos listos.</p>";
+  box.innerHTML = h || "<div class='hint'>Completa el detalle y se resume aquí; todo viaja con el estudio al guardarlo.</div>";
+  return salida;
+}
+window.addEventListener("load", function () {
+  const ancla = document.getElementById("tramCard") || document.getElementById("banCard") || document.getElementById("informeBox");
+  if (!ancla || document.getElementById("detCard")) return;
+  const cats = [["dir", "Directivos"], ["tec", "Técnicos"], ["ope", "Operarios"], ["adm", "Administrativos"], ["ser", "Servicios"]];
+  let h = "<div class='card no-print' id='detCard'><h3>🧰 Detalle del expediente</h3>";
+  h += "<p style='margin:4px 0'><b>Equipamiento itemizado</b> (costo en la moneda de la inversión del formulario)</p><table style='width:100%;font-size:13px'><thead><tr><th>Equipo</th><th>Costo</th><th>Vida útil (años)</th><th>Origen</th><th></th></tr></thead><tbody id='eqBody'></tbody></table><div class='btnrow'><button class='btn btn-d' type='button' onclick='fcEqAdd()'>+ Añadir equipo</button></div>";
+  h += "<p style='margin:10px 0 4px'><b>Plantilla por categorías</b></p><div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px'>" +
+    cats.map(function (c) { return "<div><label class='f'>" + c[1] + "</label><input type='number' id='pl_" + c[0] + "' min='0' step='1' value='0' oninput='fcDetalle()'></div>"; }).join("") + "</div>";
+  h += "<p style='margin:10px 0 4px'><b>Análisis FODA</b></p><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>" +
+    [["foF", "Fortalezas"], ["foO", "Oportunidades"], ["foD", "Debilidades"], ["foA", "Amenazas"]].map(function (c) { return "<div><label class='f'>" + c[1] + "</label><textarea id='" + c[0] + "' rows='2' style='width:100%' oninput='fcDetalle()'></textarea></div>"; }).join("") + "</div>";
+  h += "<p style='margin:10px 0 4px'><b>Anexos y respaldo documental</b></p><table style='width:100%;font-size:13px'><thead><tr><th>Tipo</th><th>Descripción</th><th>Estado</th><th></th></tr></thead><tbody id='anBody'></tbody></table><div class='btnrow'><button class='btn btn-d' type='button' onclick='fcAnAdd()'>+ Añadir anexo</button></div>";
+  h += "<div id='detBox' style='margin-top:10px'></div></div>";
+  ancla.insertAdjacentHTML("afterend", h);
+  let prev = null;
+  try { prev = JSON.parse(localStorage.getItem("facticuba_detalle_v1") || "null"); } catch (e) {}
+  if (prev) {
+    (prev.equipos || []).forEach(fcEqAdd);
+    (prev.anexos || []).forEach(fcAnAdd);
+    ["dir", "tec", "ope", "adm", "ser"].forEach(function (k) { const el = document.getElementById("pl_" + k); if (el && prev.plantilla) el.value = prev.plantilla[k] || 0; });
+    if (prev.foda) { const map = { foF: "f", foO: "o", foD: "d", foA: "a" }; Object.keys(map).forEach(function (id) { const el = document.getElementById(id); if (el) el.value = prev.foda[map[id]] || ""; }); }
+  }
+  fcDetalle();
 });
 </script>
