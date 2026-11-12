@@ -73,6 +73,15 @@ v1 y usa los fallbacks (scraping directo, Wikipedia) sin romperse.
 - Tablas del informe envueltas en `.tblwrap` (scroll horizontal en móvil); grid con `min-width:0` anti-blowout.
 - **Moneda de la inversión**: el bloque de inversión inicial tiene el desplegable `Moneda en que tiene la inversión` (CUP/USD/EUR/MLC). Si elige divisa, el motor convierte a CUP con la tasa activa del paso 1 (`invInicialCUP()`) y lo muestra en el aviso bajo el bloque; los ejemplos automáticos trabajan en CUP.
 
-## Acceso (login)
+## Acceso (login) — ACTUALIZADO 2026-11-12
 
-La app muestra una pantalla de acceso antes del contenido. Credenciales: usuario `admin`, contraseña `@RoyRay2026*` (definidas en `AUTH_USER`/`AUTH_PASS` al inicio del script en index.html y web-standalone/index.html; cámbielas ahí). La sesión se recuerda en localStorage (`facticuba_session_v1`); el botón Salir del topbar la cierra. Es un control de acceso básico, no protección criptográfica: las credenciales están visibles en el código público del generador.
+El acceso ya NO vive en el código: la app se autentica contra el servidor
+Apps Script de la base «FactiCuba DB» (huellas SHA-256 con sal en la
+pestaña Usuarios, sesiones por token con solo su huella en Sesiones,
+bloqueo tras 5 intentos fallidos). El primer usuario que se registra
+desde la propia app queda como administrador; el resto, como cliente.
+La tarjeta de acceso y la barra superior muestran el indicador de la
+base (verde = servidor alcanzado, rojo = sin conexión, ping real al
+/exec y cada 60 s). Los estudios se guardan también en la base
+(Estudios + Entradas_JSON por partes) y la copia local queda de caché.
+La credencial que traía el paquete quedó RETIRADA del código.
