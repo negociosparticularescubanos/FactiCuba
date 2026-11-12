@@ -2820,7 +2820,7 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     try {
       const arr = leerLS(), st = arr[0];
       if (st && checkSession()) {
-        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null } })
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null } })
           .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
       }
     } catch (e) {}
@@ -2960,5 +2960,90 @@ function fcCorreccionClick() {
   const box = document.getElementById("corrBox");
   if (box) box.innerHTML = "<div class='alert warn'>Probando palancas con el motor real del estudio…</div>";
   setTimeout(function () { fcBuscarCorreccion(); }, 30);
+}
+</script>
+
+<script>
+/* ===== FASE 2 — Encaje territorial =====
+   Cruza el estudio con su territorio usando SOLO datos reales:
+   población del paquete (Censo 2022/ONEI), el modelo de demanda de
+   la propia app (estimarDemanda) y el plan municipal que el usuario
+   haya cargado (compararPlan). No inventa prioridades: si no hay
+   plan cargado, lo dice y explica cómo cargarlo. */
+window._encaje = null;
+function fcEncajeTerritorial() {
+  if (!ultimoResultado) generarInforme(true);
+  const r = ultimoResultado, p = r.p, m = r.m;
+  const und = Math.round(r.und || 0);
+  const dem = r.demA ? r.demA.total : 0;
+  const pob = r.demA ? r.demA.pob : pobDe(p, m);
+  const ratio = dem > 0 ? und / dem : 0;
+  let escala, escalaTxt;
+  if (ratio > 1.3) { escala = "sobredimensionado"; escalaTxt = "Tu capacidad de venta (" + fmt(und) + " und/mes) supera la demanda que este municipio puede absorber según el modelo (" + fmt(dem) + " und/mes): vender todo exigiría captar más mercado del que existe aquí."; }
+  else if (ratio >= 0.45) { escala = "ajustado"; escalaTxt = "La escala encaja con la demanda estimada del municipio (" + fmt(dem) + " und/mes frente a tus " + fmt(und) + " und/mes)."; }
+  else { escala = "holgado"; escalaTxt = "El municipio estima demanda para " + fmt(dem) + " und/mes y tu proyecto ofrece " + fmt(und) + ": hay espacio para crecer sin cambiar de territorio."; }
+  const alts = [];
+  (PROV_MUN[p] || []).forEach(function (m2) {
+    if (m2 === m) return;
+    $("muniSel").value = m2;
+    const d2 = estimarDemanda();
+    alts.push({ muni: m2, pob: d2.pob, dem: d2.total });
+  });
+  $("muniSel").value = m; generarInforme(true);
+  alts.sort(function (a, b) { return b.dem - a.dem; });
+  const mejores = alts.filter(function (a) { return a.dem > dem; }).slice(0, 3);
+  const pc = r.planComp || { origen: "ninguna", checks: [], nivel: "sin plan" };
+  const aciertos = (pc.checks || []).filter(function (c) { return c.ok === 1; }).length;
+  const huecos = (pc.checks || []).filter(function (c) { return c.ok === 0; }).map(function (c) { return c.t; });
+  const sug = [];
+  if (escala === "sobredimensionado") sug.push("Baja la escala o fasea la capacidad: en " + m + " no hay demanda para todo lo que planeas vender; o ubica el proyecto (o un punto de venta) en un municipio con más demanda.");
+  if (mejores.length) sug.push("En tu misma provincia hay más demanda: " + mejores.map(function (a) { return a.muni + " (" + fmt(a.dem) + " und/mes)"; }).join(", ") + ", frente a " + fmt(dem) + " en " + m + ".");
+  if (pc.origen === "ninguna") sug.push("Sin plan municipal cargado no se puede puntuar la alineación — y para un PDL o ante el CAM, encajar con la Estrategia de Desarrollo Municipal pesa en la aprobación. Sube el plan en el Paso 2 (o búscalo en la web desde la propia app) y vuelve a analizar.");
+  huecos.forEach(function (t) { sug.push("Hueco frente al plan municipal: " + t + "."); });
+  if ((r.demScore || 100) < 45) sug.push("La demanda de este territorio para tu sector es débil (puntuación " + Math.round(r.demScore) + "/100). Para este municipio la app sugiere valorar: " + sugerirSector(p, m) + ".");
+  if (!sug.length) sug.push("El proyecto encaja bien en " + m + ": escala acorde, demanda suficiente y sin huecos detectados frente al plan.");
+  const salida = { fecha: new Date().toISOString(), provincia: p, municipio: m, poblacion: pob, demandaEstimada: dem, unidadesProyecto: und, ratio: Math.round(ratio * 100) / 100, escala: escala, escalaTxt: escalaTxt, planOrigen: pc.origen, planNivel: pc.nivel, planAciertos: aciertos, planChequeos: (pc.checks || []).length, huecos: huecos, alternativas: mejores, sugerencias: sug };
+  window._encaje = salida;
+  fcPintarEncaje(salida);
+  return salida;
+}
+function fcProbarMunicipio(m2) {
+  const ms = $("muniSel"); if (!ms) return;
+  ms.value = m2;
+  try { renderFicha(); } catch (e) {}
+  generarInforme(true); go("s3");
+  const box = document.getElementById("encBox");
+  if (box) box.insertAdjacentHTML("afterbegin", "<div class='alert ok'>Ahora el estudio está calculado en <b>" + escH(m2) + "</b>. Revisa el nuevo dictamen arriba y, si te sirve, guarda el estudio.</div>");
+}
+function fcPintarEncaje(e) {
+  let box = document.getElementById("encBox");
+  if (!box) {
+    const ancla = document.getElementById("corrCard") || document.getElementById("informeBox");
+    if (!ancla) return;
+    ancla.insertAdjacentHTML("afterend", "<div class='card no-print' id='encCard'><h3>🧭 Encaje territorial</h3><div id='encBox'></div></div>");
+    box = document.getElementById("encBox");
+  }
+  let h = "<p style='margin:4px 0'><b>" + escH(e.municipio) + "</b> (" + escH(e.provincia) + ") · Población " + fmt(e.poblacion) + " hab. (Censo 2022) · Demanda estimada del sector: <b>" + fmt(e.demandaEstimada) + " und/mes</b> · Tu proyecto: <b>" + fmt(e.unidadesProyecto) + " und/mes</b></p>";
+  h += "<div class='alert " + (e.escala === "sobredimensionado" ? "bad" : e.escala === "ajustado" ? "ok" : "warn") + "'><b>Escala: " + escH(e.escala) + "</b> — " + escH(e.escalaTxt) + "</div>";
+  if (e.planOrigen === "ninguna") h += "<div class='alert warn'><b>Alineación con el plan municipal: sin puntuar</b> (no hay plan cargado).</div>";
+  else h += "<div class='alert " + (e.huecos.length ? "warn" : "ok") + "'><b>Alineación con el plan municipal: " + escH(e.planNivel) + "</b> — " + e.planAciertos + " de " + e.planChequeos + " chequeos a favor" + (e.huecos.length ? "; huecos: " + e.huecos.map(escH).join(" · ") : "") + ".</div>";
+  if (e.alternativas.length) {
+    h += "<p style='margin:8px 0 4px'><b>Municipios de tu provincia con más demanda estimada:</b></p>" + e.alternativas.map(function (a) {
+      return "<div class='s'><b>" + escH(a.muni) + "</b> — " + fmt(a.pob) + " hab. · demanda " + fmt(a.dem) + " und/mes <span class='btnrow'><button class='btn btn-p' data-muni=\"" + escH(a.muni) + "\" onclick='fcProbarMunicipio(this.dataset.muni)'>Probar el estudio en " + escH(a.muni) + "</button></span></div>";
+    }).join("");
+  }
+  h += "<p style='margin:8px 0 4px'><b>Qué puedes hacer:</b></p><ul class='list'>" + e.sugerencias.map(function (t) { return "<li>" + escH(t) + "</li>"; }).join("") + "</ul>";
+  box.innerHTML = h;
+}
+window.addEventListener("load", function () {
+  const ancla = document.getElementById("corrCard") || document.getElementById("informeBox");
+  if (ancla && !document.getElementById("encCard")) {
+    ancla.insertAdjacentHTML("afterend", "<div class='card no-print' id='encCard'><h3>🧭 Encaje territorial</h3><div class='btnrow'><button class='btn btn-p' onclick='fcEncajeClick()'>Analizar encaje territorial</button></div><div id='encBox'><div class='hint'>Cruza tu estudio con su municipio: población real, demanda estimada, escala del proyecto, municipios cercanos con más demanda y alineación con el plan de desarrollo municipal.</div></div></div>");
+  }
+});
+function fcEncajeClick() {
+  const box = document.getElementById("encBox");
+  if (box) box.innerHTML = "<div class='alert warn'>Cruzando el estudio con su territorio…</div>";
+  setTimeout(function () { fcEncajeTerritorial(); }, 30);
 }
 </script>
