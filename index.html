@@ -2820,7 +2820,7 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     try {
       const arr = leerLS(), st = arr[0];
       if (st && checkSession()) {
-        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null } })
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null, bancaria: window._bancaria || null } })
           .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
       }
     } catch (e) {}
@@ -3046,4 +3046,107 @@ function fcEncajeClick() {
   if (box) box.innerHTML = "<div class='alert warn'>Cruzando el estudio con su territorio…</div>";
   setTimeout(function () { fcEncajeTerritorial(); }, 30);
 }
+</script>
+
+<script>
+/* ===== FASE 3A — Evaluación bancaria =====
+   Lo que el banco mira y la app no calculaba: tabla de amortización
+   del crédito con período de gracia (cuota fija tras la gracia,
+   interés solo durante la gracia), cobertura del servicio de la
+   deuda (DSCR) con la caja del propio estudio, relación
+   Beneficio/Costo del año estabilizado y depreciación lineal de
+   equipos e infraestructura. No toca el dictamen del motor: es la
+   capa de presentación ante el banco. */
+window._bancaria = null;
+function fcBancaria() {
+  if (!ultimoResultado) generarInforme(true);
+  const r = ultimoResultado;
+  const num = function (id, def) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? def : v; };
+  const monto = Math.max(0, num("crMonto", 0));
+  const tasa = Math.max(0, num("crTasa", 0));
+  const plazo = Math.max(1, Math.round(num("crPlazo", 60)));
+  const gracia = Math.min(plazo, Math.max(0, Math.round(num("crGracia", 0))));
+  const vidaEq = Math.max(1, num("crVidaEq", 8));
+  const vidaLoc = Math.max(1, num("crVidaLoc", 20));
+  const i = tasa / 100 / 12;
+  const nAmort = plazo - gracia;
+  let cuota = 0;
+  if (monto > 0 && nAmort > 0) cuota = i > 0 ? monto * i / (1 - Math.pow(1 + i, -nAmort)) : monto / nAmort;
+  const anios = [];
+  if (monto > 0) {
+    let saldo = monto;
+    for (let mes = 1; mes <= plazo; mes++) {
+      const interesMes = saldo * i;
+      let capitalMes = 0, cuotaMes = interesMes;
+      if (mes > gracia && nAmort > 0) { capitalMes = Math.min(saldo, cuota - interesMes); cuotaMes = interesMes + capitalMes; }
+      saldo = Math.max(0, saldo - capitalMes);
+      const idx = Math.floor((mes - 1) / 12);
+      if (!anios[idx]) anios[idx] = { anio: idx + 1, capital: 0, intereses: 0, servicio: 0, saldo: saldo, dscr: null };
+      anios[idx].capital += capitalMes; anios[idx].intereses += interesMes; anios[idx].servicio += cuotaMes; anios[idx].saldo = saldo;
+    }
+  }
+  const flujoAnual = (r.utilNeta || 0) * 12;
+  anios.forEach(function (a) { a.dscr = a.servicio > 0 ? flujoAnual / a.servicio : null; });
+  const conServicio = anios.filter(function (a) { return a.dscr != null; });
+  const dscrMin = conServicio.length ? Math.min.apply(null, conServicio.map(function (a) { return a.dscr; })) : null;
+  const egresos = (r.cvTot || 0) + (r.CF || 0) + (r.impVentasMes || 0) + (r.impUtilMes || 0);
+  const bc = egresos > 0 ? (r.ingresos || 0) / egresos : null;
+  const conv = monInv() === "CUP" ? 1 : tasaActiva(monInv());
+  const depEq = (val("invEquipos") * conv) / (vidaEq * 12);
+  const depLoc = (val("invLocal") * conv) / (vidaLoc * 12);
+  const depMes = depEq + depLoc;
+  const salida = { fecha: new Date().toISOString(), config: { monto: monto, tasa: tasa, plazo: plazo, gracia: gracia, vidaEq: vidaEq, vidaLoc: vidaLoc },
+    cuota: Math.round(cuota), anios: anios.map(function (a) { return { anio: a.anio, capital: Math.round(a.capital), intereses: Math.round(a.intereses), servicio: Math.round(a.servicio), saldo: Math.round(a.saldo), dscr: a.dscr == null ? null : Math.round(a.dscr * 100) / 100 }; }),
+    dscrMin: dscrMin == null ? null : Math.round(dscrMin * 100) / 100,
+    bc: bc == null ? null : Math.round(bc * 100) / 100,
+    depMes: Math.round(depMes), depAnual: Math.round(depMes * 12), utilTrasDep: Math.round((r.utilNeta || 0) - depMes),
+    interesTotal: Math.round(anios.reduce(function (t, a) { return t + a.intereses; }, 0)) };
+  window._bancaria = salida;
+  fcPintarBancaria(salida, r);
+  return salida;
+}
+function fcPintarBancaria(b, r) {
+  let box = document.getElementById("banBox");
+  if (!box) {
+    const ancla = document.getElementById("encCard") || document.getElementById("corrCard") || document.getElementById("informeBox");
+    if (!ancla) return;
+    ancla.insertAdjacentHTML("afterend", "<div class='card no-print' id='banCard'><h3>🏦 Evaluación bancaria</h3><div id='banBox'></div></div>");
+    box = document.getElementById("banBox");
+  }
+  let h = "";
+  if (b.config.monto <= 0) {
+    h += "<div class='alert info'>Este cálculo es <b>sin crédito</b>: no hay servicio de deuda. Si el proyecto pide crédito al banco, escribe arriba el monto, la tasa que te aprueben, el plazo y la gracia, y vuelve a calcular.</div>";
+  } else {
+    h += "<p style='margin:4px 0'>Crédito de <b>" + fmt(b.config.monto) + " CUP</b> al " + b.config.tasa + "% anual, " + b.config.plazo + " meses" + (b.config.gracia ? " con " + b.config.gracia + " de gracia (solo intereses)" : "") + ". Cuota tras la gracia: <b>" + fmt(b.cuota) + " CUP/mes</b> · Intereses totales: " + fmt(b.interesTotal) + " CUP.</p>";
+    h += "<table style='width:100%;font-size:13px'><tr><th>Año</th><th>Capital</th><th>Intereses</th><th>Servicio</th><th>Saldo</th><th>DSCR</th></tr>" +
+      b.anios.map(function (a) { return "<tr><td>" + a.anio + "</td><td>" + fmt(a.capital) + "</td><td>" + fmt(a.intereses) + "</td><td>" + fmt(a.servicio) + "</td><td>" + fmt(a.saldo) + "</td><td>" + (a.dscr == null ? "—" : a.dscr) + "</td></tr>"; }).join("") + "</table>";
+    if (b.config.gracia >= b.config.plazo) h += "<div class='alert warn'>La gracia cubre todo el plazo: el capital quedaría íntegro al vencer. Negocia amortizar dentro del plazo.</div>";
+    else if (b.dscrMin != null) {
+      if (b.dscrMin >= 1.2) h += "<div class='alert ok'><b>Cobertura sana:</b> la caja del estudio cubre el servicio de la deuda con margen (DSCR mínimo " + b.dscrMin + "; el banco suele pedir ≥ 1,20).</div>";
+      else if (b.dscrMin >= 1.0) h += "<div class='alert warn'><b>Cobertura justa:</b> DSCR mínimo " + b.dscrMin + " — cubre, pero sin colchón; el banco puede pedir más plazo, más gracia o menos monto.</div>";
+      else h += "<div class='alert bad'><b>La caja NO cubre la deuda:</b> DSCR mínimo " + b.dscrMin + " (< 1). Pide menos crédito, más plazo o más gracia — o corrige primero el estudio con la Ruta a factible.</div>";
+    }
+    h += "<p style='font-size:12px'>DSCR = utilidad neta anual del estudio ÷ servicio de la deuda del año (con la utilidad actual, sin crecimiento).</p>";
+  }
+  h += "<p style='margin:6px 0'><b>Relación Beneficio/Costo (año estabilizado): " + (b.bc == null ? "—" : b.bc) + "</b> (ingresos ÷ costos totales + tributos; debe ser > 1).</p>";
+  h += "<p style='margin:6px 0'><b>Depreciación lineal:</b> " + fmt(b.depMes) + " CUP/mes (" + fmt(b.depAnual) + " al año). No es salida de caja, pero sí costo contable: la utilidad tras depreciación sería " + fmt(b.utilTrasDep) + " CUP/mes.</p>";
+  box.innerHTML = h;
+}
+window.addEventListener("load", function () {
+  const ancla = document.getElementById("encCard") || document.getElementById("corrCard") || document.getElementById("informeBox");
+  if (ancla && !document.getElementById("banCard")) {
+    let pre = 0; const fc = document.getElementById("fCred"); if (fc && parseFloat(fc.value) > 0) pre = parseFloat(fc.value);
+    ancla.insertAdjacentHTML("afterend",
+      "<div class='card no-print' id='banCard'><h3>🏦 Evaluación bancaria</h3>" +
+      "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px'>" +
+      "<div><label class='f' for='crMonto'>Crédito solicitado (CUP)</label><input type='number' id='crMonto' min='0' step='1000' value='" + pre + "'></div>" +
+      "<div><label class='f' for='crTasa'>Tasa de interés anual (%)</label><input type='number' id='crTasa' min='0' step='0.1' value='0'></div>" +
+      "<div><label class='f' for='crPlazo'>Plazo (meses)</label><input type='number' id='crPlazo' min='1' step='1' value='60'></div>" +
+      "<div><label class='f' for='crGracia'>Gracia (meses, solo intereses)</label><input type='number' id='crGracia' min='0' step='1' value='0'></div>" +
+      "<div><label class='f' for='crVidaEq'>Vida útil equipos (años)</label><input type='number' id='crVidaEq' min='1' step='1' value='8'></div>" +
+      "<div><label class='f' for='crVidaLoc'>Vida útil local/obra (años)</label><input type='number' id='crVidaLoc' min='1' step='1' value='20'></div>" +
+      "</div><div class='btnrow'><button class='btn btn-p' onclick='fcBancaria()'>Calcular evaluación bancaria</button></div>" +
+      "<div id='banBox'><div class='hint'>La tabla de amortización con gracia, la cobertura de la deuda (DSCR), la relación Beneficio/Costo y la depreciación: lo que el banco mira antes de aprobar un crédito.</div></div></div>");
+  }
+});
 </script>
