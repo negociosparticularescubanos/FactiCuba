@@ -214,7 +214,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
     <label class="f" for="loginPass">Contraseña</label>
     <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
     <div class="alert bad" id="loginErr" hidden>Usuario o contraseña incorrectos.</div>
-    <button class="btn btn-p login-btn" onclick="doLogin()">Entrar →</button> <button class="btn btn-d login-btn" type="button" onclick="fcModoRegistro()">¿Primera vez? Crear mi cuenta</button> <div id="regBox" hidden> <label class="f" for="regNombre">Nombre</label> <input type="text" id="regNombre" autocomplete="name" placeholder="Su nombre"> <button class="btn btn-p login-btn" type="button" onclick="doRegister()">Registrarme y entrar →</button> </div> <div class="hint" style="margin-top:10px">🗄️ Base de datos: <b id="dbDotGate">conectando…</b></div>
+    <button class="btn btn-p login-btn" onclick="doLogin()">Entrar →</button> <div class="hint" style="margin-top:10px">🗄️ Base de datos: <b id="dbDotGate">conectando…</b></div>
     <div class="hint" style="margin-top:10px">La sesión se recuerda en este navegador. Pulse Salir para cerrarla.</div>
   </div>
 </div>
@@ -809,7 +809,7 @@ async function fcApi(action, data) {
   fcSetDb(true);
   return j;
 }
-async function fcPing() { try { const j = await fcApi("ping", {}); if (!j.ok) fcSetDb(false); else if (j.registro_abierto === false && typeof fcCerrarRegistro === "function") fcCerrarRegistro(); } catch (e) { fcSetDb(false); } }
+async function fcPing() { try { const j = await fcApi("ping", {}); if (!j.ok) fcSetDb(false); } catch (e) { fcSetDb(false); } }
 function checkSession() { return !!(FC_SES && FC_SES.token); }
 function applyGate() {
   const locked = !checkSession();
@@ -826,17 +826,6 @@ async function doLogin() {
   try {
     const j = await fcApi("login", { username: u, password: pw });
     if (!j.ok) { err.textContent = j.error || "Usuario o contraseña incorrectos."; err.hidden = false; return; }
-    FC_SES = { token: j.token, user: j.user }; fcGuardarSesion(); err.hidden = true; applyGate();
-  } catch (e) { err.textContent = "Sin conexión con la base de datos. Revisa tu internet."; err.hidden = false; }
-}
-function fcModoRegistro() { const b = document.getElementById("regBox"); if (b) b.hidden = !b.hidden; }
-async function doRegister() {
-  const u = (document.getElementById("loginUser").value || "").trim().toLowerCase(), pw = document.getElementById("loginPass").value || "";
-  const n = ((document.getElementById("regNombre") || {}).value || "").trim();
-  const err = document.getElementById("loginErr");
-  try {
-    const j = await fcApi("register", { username: u, password: pw, nombre: n });
-    if (!j.ok) { err.textContent = j.error || "No se pudo crear la cuenta."; err.hidden = false; return; }
     FC_SES = { token: j.token, user: j.user }; fcGuardarSesion(); err.hidden = true; applyGate();
   } catch (e) { err.textContent = "Sin conexión con la base de datos. Revisa tu internet."; err.hidden = false; }
 }
@@ -3336,25 +3325,6 @@ window.addEventListener("load", function () {
   }
   fcDetalle();
 });
-</script>
-
-<script>
-/* ===== ACCESO EXCLUSIVO — la app se cierra tras el dueño =====
-   Cuando el servidor informa registro_abierto:false (ya existe el
-   usuario del dueño), la puerta esconde el registro y lo dice. */
-function fcCerrarRegistro() {
-  const btn = document.querySelector('[onclick="fcModoRegistro()"]');
-  if (btn) btn.hidden = true;
-  const rb = document.getElementById("regBox");
-  if (rb) rb.hidden = true;
-  const card = document.querySelector(".login-card");
-  if (card && !document.getElementById("exclusivoTxt")) {
-    const d = document.createElement("div");
-    d.id = "exclusivoTxt"; d.className = "hint"; d.style.marginTop = "10px";
-    d.textContent = "🔒 App de uso exclusivo de su dueño: el registro está cerrado.";
-    card.appendChild(d);
-  }
-}
 </script>
 
 <style>
