@@ -2950,6 +2950,57 @@ function fcCorreccionClick() {
   if (box) box.innerHTML = "<div class='alert warn'>Probando palancas con el motor real del estudio…</div>";
   setTimeout(function () { fcBuscarCorreccion(); }, 30);
 }
+/* ===== RESPALDO POR INTERNET (Bloque 2, 2026-11-12) =====
+   Para los campos de mercado que el documento NO trajo, se busca en
+   internet (buscador espejo de la propia app) un dato real: solo se
+   rellena si aparece un número claro junto a su etiqueta, y queda
+   marcado «VERIFICAR». Si no aparece nada claro, el campo queda EN
+   BLANCO. Todo sigue editable. */
+async function fcRespaldoInternet() {
+  const falta = function (id) { const el = document.getElementById(id); return el && !(parseFloat(el.value) > 0); };
+  const mun = (document.getElementById("muniSel") || {}).value || "";
+  const prov = (document.getElementById("provSel") || {}).value || "";
+  const sec = (document.getElementById("sectorSel") || {}).value || "";
+  const buscar = [];
+  if (falta("salMedio")) buscar.push({ id: "salMedio", nombre: "Salario medio", q: "salario medio mensual " + mun + " " + prov + " Cuba", labels: ["salario medio mensual", "salario medio", "salario promedio"], min: 1000, max: 150000 });
+  if (falta("fijoAlquiler")) buscar.push({ id: "fijoAlquiler", nombre: "Alquiler del local", q: "alquiler de local comercial " + mun + " Cuba precio mensual CUP", labels: ["alquiler", "renta del local", "arrendamiento"], min: 1000, max: 1000000 });
+  if (falta("refInformal")) buscar.push({ id: "refInformal", nombre: "Precio informal de referencia", q: "precio " + String(sec).split("/")[0].trim() + " " + mun + " Cuba CUP", labels: ["precio de", "precio", "cuesta"], min: 10, max: 200000 });
+  if (!buscar.length) return;
+  const hb = document.getElementById("hallBox");
+  const caja = document.createElement("div");
+  if (hb) { caja.innerHTML = "<div class='alert warn' style='margin-top:8px'>🔎 El documento no trajo " + buscar.map(function (b) { return "<b>" + escH(b.nombre) + "</b>"; }).join(", ") + ": buscando datos reales en internet…</div>"; hb.appendChild(caja); }
+  const filas = [], blancos = [];
+  for (const b of buscar) {
+    let puesto = false;
+    try {
+      const rb = await fetchTexto(URL_ESPEJO_BUSCAR + "?q=" + encodeURIComponent(b.q), 15000);
+      if (rb && rb.txt) {
+        const jb = JSON.parse(rb.txt);
+        const vals = [], fuentes = [];
+        (jb.items || []).slice(0, 6).forEach(function (x) {
+          const r = fcNumTrasLocal((x.titulo || "") + " " + (x.extracto || ""), b.labels);
+          if (r && r.v >= b.min && r.v <= b.max) { vals.push(r.v); if (x.fuente && fuentes.indexOf(x.fuente) < 0) fuentes.push(x.fuente); }
+        });
+        if (vals.length) {
+          vals.sort(function (a, c) { return a - c; });
+          const med = vals.length % 2 ? vals[(vals.length - 1) / 2] : Math.round((vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2);
+          const el = document.getElementById(b.id);
+          if (el && !(parseFloat(el.value) > 0)) { el.value = med; filas.push({ c: b.nombre, v: fmt(med), ev: "Internet (" + (fuentes.slice(0, 2).join(", ") || "web") + ") — VERIFICAR" }); puesto = true; }
+        }
+      }
+    } catch (e) {}
+    if (!puesto) blancos.push(b.nombre);
+  }
+  let ht = "";
+  if (filas.length) {
+    ht += "<div class='alert ok'><b>Datos reales buscados en internet (" + filas.length + "):</b> revísalos, vienen de fuentes públicas y pueden variar por territorio.</div><div class='tblwrap'><table class='t'><tr><th>Campo</th><th>Valor</th><th>Procedencia</th></tr>";
+    filas.forEach(function (f) { ht += "<tr><td style='text-align:left'>" + escH(f.c) + "</td><td class='mono'>" + escH(String(f.v)) + "</td><td style='text-align:left;color:#475569;font-size:12px'>" + escH(f.ev) + "</td></tr>"; });
+    ht += "</table></div>";
+  }
+  if (blancos.length) ht += "<div class='alert warn' style='margin-top:6px'>Sin dato claro en internet para: <b>" + blancos.map(escH).join(", ") + "</b>. Quedan en blanco para que los pongas tú.</div>";
+  caja.innerHTML = ht;
+  if (filas.length) { try { actualizarTasasUI(); } catch (e) {} }
+}
 </script>
 
 <script>
@@ -3443,4 +3494,134 @@ window.addEventListener("load", function () {
     if (dc && doc && dc.nextSibling !== doc) dc.after(doc);
   }
 });
+</script>
+
+<script>
+/* ===== EXTRACCIÓN AMPLIADA (Bloque 1, 2026-11-12) =====
+   Al subir el documento del PROYECTO se rellenan además el financiamiento,
+   el tamaño, la fuente de cada combustible y las monedas; al subir el PLAN
+   municipal se clasifican sus restricciones en los campos de evaluación y
+   se vuelcan metas y lineamientos. Solo se escribe en campos vacíos o en
+   cero: NUNCA se pisa lo que el dueño ya puso, y todo queda editable. */
+window._fcTextoDoc = "";
+(function () {
+  const _aDoc = window.analizarDocFull;
+  window.analizarDocFull = function (t) { window._fcTextoDoc = t || ""; return _aDoc(t); };
+  const _aplica = window.aplicarDocFull;
+  window.aplicarDocFull = function (hh) {
+    const n0 = _aplica(hh);
+    let extra = 0; try { extra = fcExtraProyecto(hh); } catch (e) {}
+    setTimeout(function () { try { fcRespaldoInternet(); } catch (e) {} }, 60);
+    return n0 + extra;
+  };
+  const _aPlan = window.analizarPlan;
+  window.analizarPlan = function (txt, origen) {
+    const r = _aPlan(txt, origen);
+    try { fcExtraPlan(txt); } catch (e) {}
+    return r;
+  };
+})();
+function fcNumTrasLocal(t, labels) {
+  for (const lb of labels) {
+    try {
+      const m = t.match(new RegExp(lb + "[^\\d%]{0,60}?(\\d{1,3}(?:[.,\\s]\\d{3})+(?:[.,]\\d+)?|\\d+(?:[.,]\\d+)?)", "i"));
+      if (m) { const v = pn(m[1]); if (isFinite(v)) return { v: v, ev: m[0].slice(0, 90) }; }
+    } catch (e) {}
+  }
+  return null;
+}
+function fcExtraProyecto(hh) {
+  const t = window._fcTextoDoc || ""; if (!t) return 0;
+  const filas = [];
+  const ponerNum = function (id, labels, nombre, minV) {
+    const el = document.getElementById(id); if (!el) return;
+    if ((parseFloat(el.value) || 0) > 0) return; /* no pisar lo puesto */
+    const r = fcNumTrasLocal(t, labels);
+    if (r && r.v >= (minV || 0)) { el.value = Math.round(r.v); filas.push({ c: nombre, v: fmt(Math.round(r.v)), ev: r.ev }); }
+  };
+  ponerNum("fCredito", ["crédito bancario solicitado", "crédito solicitado", "monto del crédito", "crédito bancario", "préstamo bancario", "financiamiento bancario", "solicita un crédito de", "crédito de", "préstamo de"], "Crédito solicitado", 1000);
+  ponerNum("fAutDiv", ["autofinanciamiento en divisas", "autofinanciamiento en dólares", "autofinanciamiento en usd", "autofinanciamiento en mlc", "recursos propios en divisas"], "Autofinanciamiento en divisas", 100);
+  ponerNum("fAutCUP", ["autofinanciamiento", "recursos propios", "aporte propio", "fondos propios", "capital propio"], "Autofinanciamiento CUP", 100);
+  ponerNum("fPresTerr", ["presupuesto territorial", "fondo de desarrollo territorial", "presupuesto del territorio", "fondo territorial"], "Presupuesto territorial", 100);
+  ponerNum("fCoopIED", ["cooperación internacional", "inversión extranjera directa", "inversión extranjera", "donación", "cooperación"], "Cooperación / IED", 100);
+  /* plantilla escrita número-primero («emplea 8 trabajadores»): la
+     etiqueta tras el número no la caza la lectura base */
+  const nf = t.match(/(?:emplea|ocupa|contrata|trabajan|laboran|plantilla de)[^\d]{0,25}?(\d{1,3})\s+(?:trabajadores|empleados|obreros|personas)/i) || t.match(/(\d{1,3})\s+(?:trabajadores|empleados)\s+(?:contratados|a contratar|en plantilla)/i);
+  let ntDoc = null;
+  if (nf) {
+    ntDoc = parseInt(nf[1], 10);
+    const ntEl = document.getElementById("numTrab");
+    if (ntEl && Number(ntEl.value) !== ntDoc) { ntEl.value = ntDoc; filas.push({ c: "Personal contratado", v: ntDoc, ev: nf[0].slice(0, 80) }); }
+  }
+  /* tamaño: mención expresa o derivado de la plantilla detectada */
+  const n = normSinTilde(t); let tam = null, tamEv = "";
+  if (/mediana empresa/.test(n)) { tam = "mediana"; tamEv = "«mediana empresa» en el documento"; }
+  else if (/pequena empresa|pequeña empresa/.test(n)) { tam = "pequena"; tamEv = "«pequeña empresa» en el documento"; }
+  else if (/microempresa|micro empresa/.test(n)) { tam = "micro"; tamEv = "«microempresa» en el documento"; }
+  else if (ntDoc || (hh && hh.vals && hh.vals.numTrab)) { const nt = ntDoc || hh.vals.numTrab; tam = nt <= 10 ? "micro" : nt <= 35 ? "pequena" : nt <= 100 ? "mediana" : null; tamEv = "derivado de la plantilla detectada (" + nt + " trabajadores)"; }
+  const tsel = document.getElementById("tamanoSel");
+  if (tam && tsel && tsel.value !== tam) { tsel.value = tam; filas.push({ c: "Tamaño del actor", v: tam, ev: tamEv }); }
+  /* fuente de cada combustible */
+  const fuentes = [["fuGas", "qGas", "gasolina", "Gasolina"], ["fuDie", "qDie", "diésel|diesel", "Diésel"], ["fuBal", "qBal", "gas licuado|balita|balón de gas", "Gas licuado"], ["fuKwh", "qKwh", "electricidad|kilovatio|kwh", "Electricidad"]];
+  for (const f of fuentes) {
+    const el = document.getElementById(f[0]); if (!el) continue;
+    const re = new RegExp("(" + f[2] + ")[^.\n]{0,60}?(estatal|informal)|(estatal|informal)[^.\n]{0,40}?(" + f[2] + ")", "i");
+    const m = t.match(re);
+    let val = m ? (m[2] || m[3] || "").toLowerCase() : null;
+    if (!val) {
+      const g = t.match(/(combustible|energía)[^.\n]{0,50}?(mercado informal|red estatal|estatal|informal)/i);
+      const qEl = document.getElementById(f[1]);
+      if (g && qEl && (parseFloat(qEl.value) || 0) > 0) val = /informal/.test(g[2].toLowerCase()) ? "informal" : "estatal";
+    }
+    if (val && el.value !== val) { el.value = val; filas.push({ c: "Fuente: " + f[3], v: val, ev: "mención en el documento" }); }
+  }
+  /* monedas de ingresos y costos */
+  const monDe = function (re) { const m = t.match(re); if (!m) return null; const w = normSinTilde(m[1]); return /dolar|usd/.test(w) ? "USD" : /mlc/.test(w) ? "MLC" : /eur/.test(w) ? "EUR" : "CUP"; };
+  const mi = monDe(/(?:ingresos|ventas)[^.\n]{0,45}?en\s+(dólares|dolares|usd|mlc|euros|eur|cup)\b/i);
+  if (mi) { const el = document.getElementById("monIngresos"); if (el && el.value !== mi) { el.value = mi; filas.push({ c: "Moneda de ingresos", v: mi, ev: "mención en el documento" }); } const md = document.getElementById("monDivisa"); if (md && mi !== "CUP" && md.value !== mi) md.value = mi; }
+  const mc = monDe(/(?:costos|gastos|compras)[^.\n]{0,45}?en\s+(dólares|dolares|usd|mlc|euros|eur|cup)\b/i);
+  if (mc) { const el = document.getElementById("monCostos"); if (el && el.value !== mc) { el.value = mc; filas.push({ c: "Moneda de costos", v: mc, ev: "mención en el documento" }); } }
+  if (filas.length) {
+    const hb = document.getElementById("hallBox");
+    if (hb) {
+      let ht = "<div class='alert ok' style='margin-top:8px'><b>Datos adicionales detectados (" + filas.length + "):</b> financiamiento, tamaño, fuentes y monedas. También editables.</div><div class='tblwrap'><table class='t'><tr><th>Campo</th><th>Valor detectado</th><th>Evidencia</th></tr>";
+      filas.forEach(function (f) { ht += "<tr><td style='text-align:left'>" + escH(f.c) + "</td><td class='mono'>" + escH(String(f.v)).slice(0, 60) + "</td><td style='text-align:left;color:#475569;font-size:12px'>" + escH(f.ev).slice(0, 90) + "</td></tr>"; });
+      hb.insertAdjacentHTML("beforeend", ht + "</table></div>");
+    }
+  }
+  try { actualizarTasasUI(); } catch (e) {}
+  return filas.length;
+}
+function fcExtraPlan(txt) {
+  const frases = String(txt || "").split(/[\n\.]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 15 && x.length < 230; });
+  const cats = [
+    ["eRestEner", /(apag|déficit energ|deficit energ|electric|red eléctrica|generación|combustible para generar)/i, "energía"],
+    ["eRestDiv", /(divisa|dólares|dolares|importa|insumos importados|mlc|usd)/i, "divisas"],
+    ["eRestLog", /(transporte|flete|vial|carretera|logíst|distribu|acopio)/i, "logística"],
+    ["eRestReg", /(trámite|permiso|licencia|norma|regulaci|aprobaci|registro|onap|onat)/i, "regulación"]];
+  let tocados = 0;
+  for (const c of cats) {
+    const el = document.getElementById(c[0]); if (!el || (el.value || "").trim()) continue;
+    const hits = frases.filter(function (f) { return c[1].test(f); }).slice(0, 2);
+    if (hits.length) { el.value = hits.join(". ").slice(0, 300); tocados++; }
+  }
+  const esFabrica = function (el, prefijo) { const v = (el.value || "").trim(); return !v || v.indexOf(prefijo) === 0; };
+  const em = document.getElementById("eMetasPlan");
+  if (em && esFabrica(em, "Plan 2025-2026 (supuestos") && window._planMun && window._planMun.metas && window._planMun.metas.length) {
+    em.value = window._planMun.metas.slice(0, 4).join(" · ").slice(0, 600); tocados++;
+  }
+  const el2 = document.getElementById("eLineam");
+  if (el2 && esFabrica(el2, "Contribuye a los Lineamientos")) {
+    const lin = frases.filter(function (f) { return /lineamiento/i.test(f); }).slice(0, 2);
+    if (lin.length) { el2.value = lin.join(". ").slice(0, 400); tocados++; }
+  }
+  const ter = (typeof detectarTerritorio === "function") ? detectarTerritorio(txt) : null;
+  if (ter) {
+    const actual = (document.getElementById("muniSel") || {}).value || "";
+    const box = document.getElementById("planBox");
+    if (box && actual && ter.m !== actual) box.insertAdjacentHTML("beforeend", "<div class='alert warn' style='margin-top:6px'>Ojo: el plan menciona <b>" + escH(ter.m) + ", " + escH(ter.p) + "</b> y tu estudio está en <b>" + escH(actual) + "</b>. No cambié el territorio: revísalo tú.</div>");
+  }
+  if (tocados) { try { autoRegen(); } catch (e) {} }
+  return tocados;
+}
 </script>
