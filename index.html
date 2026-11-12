@@ -210,11 +210,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
     <h2>FactiCuba</h2>
     <p class="login-sub">Acceso restringido · introduzca sus credenciales</p>
     <label class="f" for="loginUser">Usuario</label>
-    <input type="text" id="loginUser" value="admin" autocomplete="username">
+    <input type="text" id="loginUser" autocomplete="username">
     <label class="f" for="loginPass">Contraseña</label>
     <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
     <div class="alert bad" id="loginErr" hidden>Usuario o contraseña incorrectos.</div>
-    <button class="btn btn-p login-btn" onclick="doLogin()">Entrar →</button>
+    <button class="btn btn-p login-btn" onclick="doLogin()">Entrar →</button> <button class="btn btn-d login-btn" type="button" onclick="fcModoRegistro()">¿Primera vez? Crear mi cuenta</button> <div id="regBox" hidden> <label class="f" for="regNombre">Nombre</label> <input type="text" id="regNombre" autocomplete="name" placeholder="Su nombre"> <button class="btn btn-p login-btn" type="button" onclick="doRegister()">Registrarme y entrar →</button> </div> <div class="hint" style="margin-top:10px">🗄️ Base de datos: <b id="dbDotGate">conectando…</b></div>
     <div class="hint" style="margin-top:10px">La sesión se recuerda en este navegador. Pulse Salir para cerrarla.</div>
   </div>
 </div>
@@ -249,7 +249,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
       
       <span class="pill" id="userPill" hidden>👤 admin</span>
       <button class="logout-btn" id="logoutBtn" onclick="doLogout()" hidden>Salir</button>
-      <span class="pill live" id="netPill"><span class="livedot stale"></span>conectando…</span>
+      <span class="pill live" id="dbPill"><span class="livedot stale" id="dbDot"></span>base de datos…</span> <span class="pill live" id="netPill"><span class="livedot stale"></span>conectando…</span>
       <span class="pill live ticker" id="tickPill"><span class="livedot stale"></span>conectando…</span>
     </div>
   </div>
@@ -793,23 +793,84 @@ const SECT = {
 const LS_KEY = "facticuba_estudios_v1";
 let ultimoResultado = null;
 
-/* ---- Acceso (login local) ---- */
-const AUTH_USER="admin", AUTH_PASS="@RoyRay2026*";
-function checkSession(){ try{ return localStorage.getItem("facticuba_session_v1")==="1"; }catch(e){ return false; } }
-function applyGate(){
-  const locked=!checkSession();
-  document.body.classList.toggle("locked",locked);
-  const g=document.getElementById("loginGate"); if(g) g.hidden=!locked;
-  const up=document.getElementById("userPill"); if(up) up.hidden=locked;
-  const lo=document.getElementById("logoutBtn"); if(lo) lo.hidden=locked;
+/* ---- Acceso (servidor FactiCuba) + conexión a la base ---- */
+const FC_API = "https://script.google.com/macros/s/AKfycbyfQDLE3QcrboYqee1SQ87rxugBwTgoFRJV_lCY-k7DIWyY1tjjo5aYm5JBRJsUhEv8/exec";
+let FC_SES = null;
+try { FC_SES = JSON.parse(localStorage.getItem("facticuba_sesion_v2") || "null"); } catch (e) { FC_SES = null; }
+function fcSetDb(ok) {
+  const d = document.getElementById("dbDot"); if (d) { d.className = "livedot"; d.style.background = ok ? "#22c55e" : "#ef4444"; }
+  const t = document.getElementById("dbPill"); if (t && t.lastChild) t.lastChild.textContent = ok ? "base conectada" : "base sin conexión";
+  const g = document.getElementById("dbDotGate"); if (g) { g.textContent = ok ? "● conectada" : "● sin conexión"; g.style.color = ok ? "#16a34a" : "#dc2626"; }
 }
-function doLogin(){
-  const u=(document.getElementById("loginUser").value||"").trim(), p=document.getElementById("loginPass").value||"";
-  if(u===AUTH_USER&&p===AUTH_PASS){ try{ localStorage.setItem("facticuba_session_v1","1"); }catch(e){} document.getElementById("loginErr").hidden=true; applyGate(); }
-  else { document.getElementById("loginErr").hidden=false; }
+async function fcApi(action, data) {
+  const body = Object.assign({ action: action, token: FC_SES ? FC_SES.token : null }, data || {});
+  const r = await fetch(FC_API, { method: "POST", body: JSON.stringify(body) });
+  const j = await r.json();
+  fcSetDb(true);
+  return j;
 }
-function doLogout(){ try{ localStorage.removeItem("facticuba_session_v1"); }catch(e){} const lp=document.getElementById("loginPass"); if(lp) lp.value=""; applyGate(); }
-
+async function fcPing() { try { const j = await fcApi("ping", {}); if (!j.ok) fcSetDb(false); } catch (e) { fcSetDb(false); } }
+function checkSession() { return !!(FC_SES && FC_SES.token); }
+function applyGate() {
+  const locked = !checkSession();
+  document.body.classList.toggle("locked", locked);
+  const g = document.getElementById("loginGate"); if (g) g.hidden = !locked;
+  const up = document.getElementById("userPill"); if (up) { up.hidden = locked; if (!locked && FC_SES) up.textContent = "\u{1F464} " + (FC_SES.user.nombre || FC_SES.user.usuario); }
+  const lo = document.getElementById("logoutBtn"); if (lo) lo.hidden = locked;
+  if (!locked) fcSyncEstudios();
+}
+function fcGuardarSesion() { try { localStorage.setItem("facticuba_sesion_v2", JSON.stringify(FC_SES)); } catch (e) {} }
+async function doLogin() {
+  const u = (document.getElementById("loginUser").value || "").trim().toLowerCase(), pw = document.getElementById("loginPass").value || "";
+  const err = document.getElementById("loginErr");
+  try {
+    const j = await fcApi("login", { username: u, password: pw });
+    if (!j.ok) { err.textContent = j.error || "Usuario o contraseña incorrectos."; err.hidden = false; return; }
+    FC_SES = { token: j.token, user: j.user }; fcGuardarSesion(); err.hidden = true; applyGate();
+  } catch (e) { err.textContent = "Sin conexión con la base de datos. Revisa tu internet."; err.hidden = false; }
+}
+function fcModoRegistro() { const b = document.getElementById("regBox"); if (b) b.hidden = !b.hidden; }
+async function doRegister() {
+  const u = (document.getElementById("loginUser").value || "").trim().toLowerCase(), pw = document.getElementById("loginPass").value || "";
+  const n = ((document.getElementById("regNombre") || {}).value || "").trim();
+  const err = document.getElementById("loginErr");
+  try {
+    const j = await fcApi("register", { username: u, password: pw, nombre: n });
+    if (!j.ok) { err.textContent = j.error || "No se pudo crear la cuenta."; err.hidden = false; return; }
+    FC_SES = { token: j.token, user: j.user }; fcGuardarSesion(); err.hidden = true; applyGate();
+  } catch (e) { err.textContent = "Sin conexión con la base de datos. Revisa tu internet."; err.hidden = false; }
+}
+async function doLogout() {
+  try { if (FC_SES) await fcApi("logout", {}); } catch (e) {}
+  FC_SES = null; try { localStorage.removeItem("facticuba_sesion_v2"); } catch (e) {}
+  const lp = document.getElementById("loginPass"); if (lp) lp.value = "";
+  applyGate();
+}
+async function fcSyncEstudios() {
+  if (!checkSession()) return;
+  try {
+    const j = await fcApi("estudios_list", {});
+    if (!j.ok) return;
+    const arr = leerLS(); const bySrv = {};
+    arr.forEach(function (x) { if (x.srv) bySrv[x.srv] = x; });
+    let changed = false;
+    (j.estudios || []).forEach(function (e) {
+      if (!bySrv[e.estudio_id]) {
+        arr.unshift({ id: "srv-" + e.estudio_id, srv: e.estudio_id, inputs: null, plan: null, fuentesWeb: null, preMercado: null, resumen: { nombre: e.nombre, dict: e.dict, util: e.util, pri: e.pri, margen: e.margen, fecha: e.fecha, p: e.p, m: e.m } });
+        changed = true;
+      }
+    });
+    if (changed) { escribirLS(arr); listarGuardados(); }
+  } catch (e) {}
+}
+async function fcAbrirServidor(entry) {
+  const j = await fcApi("estudio_get", { estudio_id: entry.srv });
+  if (!j.ok) throw new Error(j.error || "No se pudo abrir el estudio");
+  entry.inputs = j.payload.inputs; entry.plan = j.payload.plan || null; entry.fuentesWeb = j.payload.fuentesWeb || null; entry.preMercado = j.payload.preMercado || null;
+  const arr = leerLS(); const i = arr.findIndex(function (x) { return x.srv === entry.srv; });
+  if (i >= 0) { arr[i] = entry; escribirLS(arr); }
+  return entry;
+}
 function $(id){return document.getElementById(id);}
 function fmt(n){ if(!isFinite(n)) return "—"; return new Intl.NumberFormat("es-CU",{maximumFractionDigits:0}).format(Math.round(n)); }
 function fmt1(n){ if(!isFinite(n)) return "—"; return new Intl.NumberFormat("es-CU",{maximumFractionDigits:1}).format(n); }
@@ -2747,4 +2808,36 @@ if(desdeEnlace){ const st=$("syncStatus"); if(st) st.textContent="🔗 Estudio c
 else if(typeof navigator!=="undefined"&&navigator.onLine){ sincronizarTasas(false); }
 else { const st=$("syncStatus"); if(st) st.textContent="⚠️ Sin conexión: valores de referencia. Reconecte para datos en vivo."; }
 $("muniSel").onchange=renderFicha; $("provSel").onchange=cargarMun;
+</script>
+
+<script>
+/* FactiCuba conectada: sincroniza los guardados con la base y vigila la conexión */
+window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 60000); });
+(function () {
+  const _gs = guardarEstudio;
+  guardarEstudio = function () {
+    _gs();
+    try {
+      const arr = leerLS(), st = arr[0];
+      if (st && checkSession()) {
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen } })
+          .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
+      }
+    } catch (e) {}
+  };
+  const _bg = borrarGuardado;
+  borrarGuardado = function (i) {
+    try { const a0 = leerLS(), s0 = a0[i]; if (s0 && s0.srv && checkSession()) fcApi("estudio_delete", { estudio_id: s0.srv }).catch(function () {}); } catch (e) {}
+    _bg(i);
+  };
+  const _cg = cargarGuardado;
+  cargarGuardado = async function (i) {
+    const arr = leerLS(), st = arr[i];
+    if (st && st.srv && !st.inputs) {
+      try { await fcAbrirServidor(st); }
+      catch (e) { const box = document.getElementById("savedBox"); if (box) box.insertAdjacentHTML("afterbegin", "<div class='alert bad'>No se pudo descargar el estudio de la base: " + (e.message || e) + "</div>"); return; }
+    }
+    _cg(i);
+  };
+})();
 </script>
