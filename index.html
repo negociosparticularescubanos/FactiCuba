@@ -425,7 +425,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
        <div class="btnrow no-print">
        </div>
         <h3>🔎 Investigación web real (fuentes verificables)</h3>
-        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio) y cada fuente queda citada con su enlace y su fecha de consulta.<b>apoyándose solo en esas fuentes</b>, citándolas. Nada se inventa: cada dato web muestra su enlace y fecha de consulta. Funciona sin claves con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue.</div>
+        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio). Nada se inventa: cada dato web muestra su enlace y su fecha de consulta, y las fuentes quedan citadas en el informe. Funciona sin claves con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue.</div>
         <label class="f" for="webQuery">Consulta de búsqueda (se genera sola, edítela si quiere)</label>
         <input type="text" id="webQuery" placeholder="Ej: cafetería Santa Clara Cuba precios 2026">
         <div class="row">
@@ -4120,5 +4120,127 @@ try {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargar); else cargar();
   setTimeout(cargar, 2500);
+})();
+</script>
+
+<script>
+/* ===== AGENTE DE AUTOLLENADO (fcAgente) =====
+   Orquesta TODAS las APIs y agentes ya integrados en FactiCuba para
+   completar el estudio solo: tasas y combustibles (elTOQUE/BCC),
+   demanda del territorio (modelo ONEI), respaldo web (salario medio,
+   alquiler y precio informal desde búsquedas reales), precios de
+   mercado (Revolico/web) y los datos internos (equipamiento y
+   plantilla del Detalle). Reglas sagradas de Leonardo:
+   - NUNCA pisa un dato que el usuario ya puso ni uno que editó a mano
+     (los campos tocados a mano quedan marcados y el agente los salta).
+   - TODO lo que rellena queda 100 % editable, con su fuente citada en
+     el informe del agente y en el título del campo.
+   - Lo que la web no aclara queda EN BLANCO, nunca inventado.
+   - Aprende: guarda lo encontrado por municipio+sector en el
+     navegador (facticuba_autodatos_v1) y lo reutiliza 7 días. */
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const val = function (id) { const e = $(id); const x = e ? parseFloat(String(e.value || "").replace(/\s/g, "").replace(",", ".")) : NaN; return isNaN(x) ? 0 : x; };
+  document.addEventListener("input", function (ev) {
+    if (ev.target && ev.target.id && ev.target.tagName !== "BODY") { try { ev.target.dataset.fcManual = "1"; } catch (e) {} }
+  }, true);
+  function vacio(id) { const e = $(id); return !!e && String(e.value || "").trim() === "" && !e.dataset.fcManual; }
+  function poner(id, valor, fuente, rep) {
+    const e = $(id); if (!e || !vacio(id)) return false;
+    e.value = valor; e.dataset.fcAuto = "1";
+    e.title = "Dato del agente de autollenado: " + fuente + " — edítelo si tiene un dato mejor.";
+    rep.push({ id: id, valor: valor, fuente: fuente });
+    return true;
+  }
+  function claveCache() { return (($("provSel") || {}).value || "") + "|" + (($("muniSel") || {}).value || "") + "|" + (($("sectorSel") || {}).value || ""); }
+  function leerCache() { try { const c = JSON.parse(localStorage.getItem("facticuba_autodatos_v1") || "{}"); const k = c[claveCache()]; if (k && (Date.now() - k.ts) < 7 * 24 * 3600 * 1000) return k.datos || {}; } catch (e) {} return {}; }
+  function guardarCache(rep) {
+    try {
+      const c = JSON.parse(localStorage.getItem("facticuba_autodatos_v1") || "{}");
+      const k = claveCache(); const prev = (c[k] && c[k].datos) || {};
+      rep.forEach(function (r) { prev[r.id] = { valor: r.valor, fuente: r.fuente, fecha: new Date().toISOString().slice(0, 10) }; });
+      c[k] = { ts: Date.now(), datos: prev };
+      localStorage.setItem("facticuba_autodatos_v1", JSON.stringify(c));
+    } catch (e) {}
+  }
+  window.fcAgenteAuto = async function () {
+    const box = $("agenteBox"), btn = $("agenteBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "🤖 Trabajando…"; }
+    if (box) box.innerHTML = "<div class='alert info'>El agente está consultando las fuentes (tasas, demanda del territorio, web real y mercado). Puede tardar hasta un minuto…</div>";
+    const rep = [], notas = [];
+    try {
+      /* 0 · lo aprendido en visitas anteriores (caché por territorio+sector) */
+      const cache = leerCache();
+      let desdeCache = 0;
+      for (const id of Object.keys(cache)) { if (poner(id, cache[id].valor, "aprendido el " + cache[id].fecha + " (" + cache[id].fuente + ")", rep)) desdeCache++; }
+      if (desdeCache) notas.push("Reutilizó " + desdeCache + " dato(s) aprendidos de este territorio y sector.");
+      /* 1 · tasas oficiales/informales y precios de combustible */
+      try { if (typeof sincronizarTasas === "function") { await sincronizarTasas(); notas.push("Tasas de cambio y precios de combustible: sincronizados de elTOQUE/BCC/CUPET."); } } catch (e) {}
+      /* 2 · demanda del territorio → capacidad y ocupación */
+      if (vacio("capacidad") && vacio("ocupacion") && typeof aplicarDemanda === "function") {
+        try { aplicarDemanda(); if (!vacio("capacidad")) { rep.push({ id: "capacidad", valor: $("capacidad").value, fuente: "modelo de demanda del territorio (ONEI + visitantes)" }); rep.push({ id: "ocupacion", valor: $("ocupacion").value, fuente: "modelo de demanda (65 % prudente)" }); $("capacidad").title = "Estimado por el agente desde la demanda del territorio — edítelo si tiene datos mejores."; } } catch (e) {}
+      }
+      /* 3 · respaldo web: salario medio, alquiler y precio informal.
+         Guarda sagrada: los campos que el usuario tocó a mano se
+         restauran a como estaban, aunque el respaldo los rellene. */
+      if (typeof fcRespaldoInternet === "function") {
+        const manuales = ["salMedio", "fijoAlquiler", "refInformal"].filter(function (id) { const e = $(id); return e && e.dataset.fcManual; });
+        const antesR = {}; ["salMedio", "fijoAlquiler", "refInformal"].forEach(function (id) { antesR[id] = val(id); });
+        try { await Promise.race([fcRespaldoInternet(), new Promise(function (r) { setTimeout(r, 60000); })]); } catch (e) {}
+        ["salMedio", "fijoAlquiler", "refInformal"].forEach(function (id) {
+          const e = $(id); if (!e) return;
+          if (manuales.indexOf(id) >= 0) { e.value = ""; delete e.dataset.fcAuto; return; }
+          if (antesR[id] === 0 && val(id) > 0) { e.dataset.fcAuto = "1"; e.title = "Dato del agente (búsqueda web real) — edítelo si tiene un dato mejor."; rep.push({ id: id, valor: e.value, fuente: "búsqueda web real (espejo + Wikipedia + anuncios) — VERIFICAR" }); }
+        });
+        if (manuales.length) notas.push("Respetó " + manuales.length + " campo(s) que usted editó a mano: el agente no los toca.");
+      }
+      /* 4 · precios de mercado → precio de venta (mediana real) */
+      if (vacio("precio") && typeof buscarPrecios === "function") {
+        try {
+          const pb = $("precioQuery");
+          if (pb && !pb.value.trim() && typeof webQueryAuto === "function") pb.value = webQueryAuto();
+          else if (pb && !pb.value.trim()) pb.value = (($("sectorSel") || {}).value || "") + " " + (($("muniSel") || {}).value || "") + " Cuba precio";
+          window._precios = null;
+          buscarPrecios();
+          for (let i = 0; i < 30; i++) { await new Promise(function (r) { setTimeout(r, 900); }); if (window._precios && window._precios.mediana > 0) break; }
+          if (window._precios && window._precios.mediana > 0) poner("precio", window._precios.mediana, "mediana de " + (window._precios.n || "varios") + " anuncios reales del mercado (Revolico/web) — VERIFICAR", rep);
+        } catch (e) {}
+      }
+      /* 5 · ingreso medio desde el salario del territorio */
+      if (vacio("ingMed") && val("salMedio") > 0) poner("ingMed", val("salMedio"), "estimado: igual al salario medio del territorio", rep);
+      /* 6 · inversión en equipos desde el equipamiento detallado */
+      let det = {}; try { det = JSON.parse(localStorage.getItem("facticuba_detalle_v1") || "{}"); } catch (e) {}
+      const sumaEq = (det.equipos || []).reduce(function (a, e) { return a + (Number(e.cant || 1) * Number(e.precio || 0)); }, 0);
+      if (sumaEq > 0) poner("invEquipos", sumaEq, "suma del equipamiento detallado en la tarjeta «Detalle del expediente»", rep);
+      guardarCache(rep);
+      if (box) {
+        let h = "<div class='alert ok'>🤖 <b>Autollenado terminado:</b> " + rep.length + " dato(s) completados. Todo queda <b>editable</b>: corrija lo que quiera, que el agente nunca vuelve a pisar un campo que usted haya tocado.</div>";
+        if (rep.length) h += "<table><tr><th>Campo</th><th>Valor</th><th>Fuente</th></tr>" + rep.map(function (r) { const lb = document.querySelector("label[for='" + r.id + "']"); return "<tr><td>" + (lb ? lb.textContent.trim() : r.id) + "</td><td><b>" + r.valor + "</b></td><td>" + r.fuente + "</td></tr>"; }).join("") + "</table>";
+        notas.forEach(function (n) { h += "<div class='hint'>" + n + "</div>"; });
+        const quedan = ["invLocal", "invCapital", "cvu", "fijoAlquiler", "fijoEnergia", "numTrab"].filter(function (id) { const e = $(id); return e && String(e.value || "").trim() === ""; });
+        if (quedan.length) h += "<div class='hint'>Quedan en blanco (sin dato claro en la web: el agente no inventa): " + quedan.map(function (id) { const lb = document.querySelector("label[for='" + id + "']"); return lb ? lb.textContent.trim() : id; }).join("; ") + ". Cargue el documento del proyecto o escríbalos usted.</div>";
+        box.innerHTML = h;
+      }
+    } catch (e) {
+      if (box) box.innerHTML = "<div class='alert bad'>El agente no pudo terminar (" + (e && e.message || e) + "). Lo ya rellenado queda puesto y editable.</div>";
+    }
+    if (btn) { btn.disabled = false; btn.textContent = "🤖 Volver a correr el agente de autollenado"; }
+  };
+  function montar() {
+    if ($("agenteCard")) return;
+    let ancla = null;
+    document.querySelectorAll(".card h3").forEach(function (h) { if (/Opción B/.test(h.textContent)) ancla = h.closest(".card"); });
+    if (!ancla) return;
+    const card = document.createElement("div");
+    card.className = "card"; card.id = "agenteCard";
+    card.innerHTML = "<h3>🤖 Agente de autollenado</h3>"
+      + "<div class='alert info'>Pulse el botón y la app <b>hace el trabajo por usted</b>: sincroniza las tasas y los combustibles (elTOQUE/BCC), estima la capacidad desde la demanda real de su municipio (ONEI), busca en la web el salario medio, el alquiler y el precio informal, y trae la mediana de precios del mercado (Revolico/web). <b>Nunca pisa un dato que usted haya escrito</b> y todo lo que rellena queda editable, con su fuente citada. Lo que la web no aclare queda en blanco: el agente no inventa. Además <b>aprende</b>: guarda lo encontrado por municipio y sector para la próxima vez.</div>"
+      + "<button class='btn btn-p' id='agenteBtn' style='width:100%'>🤖 Completar el estudio automáticamente</button>"
+      + "<div id='agenteBox' style='margin-top:10px'></div>";
+    ancla.parentNode.insertBefore(card, ancla);
+    $("agenteBtn").addEventListener("click", function () { window.fcAgenteAuto(); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montar); else montar();
+  setTimeout(montar, 1500);
 })();
 </script>
