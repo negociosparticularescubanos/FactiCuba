@@ -2773,7 +2773,7 @@ window.addEventListener("load", function () { fcPing(); setInterval(fcPing, 6000
     try {
       const arr = leerLS(), st = arr[0];
       if (st && checkSession()) {
-        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null, bancaria: window._bancaria || null, tramites: window._tramites || null, detalle: window._detalle || null } })
+        fcApi("estudio_save", { estudio_id: st.srv || undefined, payload: { inputs: st.inputs, plan: st.plan, fuentesWeb: st.fuentesWeb, preMercado: st.preMercado, resumen: st.resumen, correccion: window._correccion || null, encaje: window._encaje || null, bancaria: window._bancaria || null, tramites: window._tramites || null, detalle: window._detalle || null, integral: window._integral || null } })
           .then(function (j) { if (j.ok) { st.srv = j.estudio_id; escribirLS(arr); } }).catch(function () {});
       }
     } catch (e) {}
@@ -3615,4 +3615,180 @@ try {
     localStorage.setItem("facticuba_sin_claves_v1", "1");
   }
 } catch (e) {}
+</script>
+
+<script>
+/* ===== FACTIBILIDAD INTEGRAL 2026 — social · ambiental · legal =====
+   Marco aplicado AUTOMÁTICAMENTE según el caso (estudiado de las fuentes):
+   - Con inversión extranjera/cooperación: PLAN DE NEGOCIO en lugar de
+     estudio de factibilidad (Transformaciones Económicas y Sociales 2026,
+     176 medidas; anuncio MINCEX en FIHAV 2025: evaluación de la Comisión
+     en 7 días y silencio positivo; nuevo reglamento de la Ley 118 en
+     elaboración). Sin IED: estudio de factibilidad (Resolución Conjunta
+     1/2022 MINCEX-MEP + Decreto 327/2014 del proceso inversionista, que
+     define la factibilidad con aspectos técnicos, de mercado, AMBIENTALES
+     y económico-financieros).
+   - Ambiental: Ley 150/2022 + Resolución CITMA 132/2009 (EIA).
+   - Vivienda/construcción: Ley 187/2026 + Decreto 176/2026 (Gaceta 86):
+     vivienda adecuada art. 12 (≥25 m² útiles), certificación catastral
+     vigente 5 años (art. 18.4; Res. INOTU 15/2026), zonas especiales
+     (arts. 271-272) e impacto patrimonial si hay IED (medida 126).
+   Lo social y lo ambiental se puntúan con lo que la app ya sabe
+   (empleos, nómina, sector, trámites) + tres datos editables mínimos. */
+(function () {
+  const KEY = "facticuba_integral_v1";
+  const DEF = { mod: "auto", renov: "no", m2: "", zona: "no", viv: "auto" };
+  const leer = function () { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { return Object.assign({}, DEF); } };
+  const guardar = function (st) { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+  const gv = function (id) { const el = document.getElementById(id); return el ? String(el.value || "") : ""; };
+  const gn = function (id) { return parseFloat(gv(id)) || 0; };
+  function textoProy() { return (gv("nomProy") + " " + gv("descProy")).toLowerCase(); }
+  function esVivienda() { return gv("sectorSel").indexOf("Construcción") === 0 || /vivienda|inmobili|apartamento/.test(textoProy()); }
+  function incluyeViv(st) { if (st.viv === "si") return true; if (st.viv === "no") return false; return /vivienda|apartamento|inmueble/.test(textoProy()); }
+  window.fcIntegralCalc = function () {
+    const st = leer();
+    let r = null; try { r = ultimoResultado; } catch (e) {}
+    const ied = gn("fCoopIED") > 0;
+    const mod = st.mod === "auto" ? (ied ? "plan" : "fact") : st.mod;
+    /* --- dimensión social --- */
+    const det = window._detalle || null;
+    const empleos = (det && det.plantillaTotal) || gn("numTrab") || gn("eEmpleos") || 0;
+    let soc = null; const socD = [];
+    if (r) {
+      soc = 0;
+      const pEmp = Math.min(30, Math.round(empleos * 2));
+      soc += pEmp; socD.push("Empleos directos creados: <b>" + empleos + "</b> (" + pEmp + "/30)");
+      const salT = gn("salMedio");
+      if (empleos > 0 && r.nomina > 0 && salT > 0) {
+        const salP = r.nomina / empleos, ratio = salP / salT;
+        const pSal = ratio >= 1.2 ? 25 : ratio >= 1 ? 20 : ratio >= 0.8 ? 12 : 6;
+        soc += pSal; socD.push("Salario medio del proyecto " + fmt(Math.round(salP)) + " CUP vs " + fmt(salT) + " del territorio (" + pSal + "/25)");
+      } else socD.push("Salario del proyecto: sin datos suficientes (0/25)");
+      const sec = gv("sectorSel");
+      const directo = ["Gastronomía / cafetería", "Comercio minorista", "Agro / alimentos", "Belleza / salud", "Turismo / alojamiento"].indexOf(sec) >= 0;
+      const pBen = directo ? 20 : (sec.indexOf("Servicios") === 0 ? 12 : 14);
+      soc += pBen; socD.push("Beneficio directo a la población (" + escH(sec) + "): " + pBen + "/20");
+      const pPlan = (r.planComp != null && r.planComp > 0) || window._planMun ? 15 : 0;
+      soc += pPlan; socD.push(pPlan ? "Alineado con el plan de desarrollo municipal (15/15)" : "Sin plan municipal cargado o sin alineación medida (0/15)");
+      const pEnc = (gv("eEncad").trim() || gv("eAporte").trim()) ? 10 : 0;
+      soc += pEnc; socD.push(pEnc ? "Encadenamiento y aporte local declarados (10/10)" : "Sin encadenamiento ni aporte local declarados (0/10)");
+      soc = Math.min(100, soc);
+    }
+    /* --- dimensión ambiental --- */
+    const secA = gv("sectorSel");
+    const riesgoAlto = ["Manufactura ligera", "Construcción / mantenimiento", "Transporte / mensajería", "Agro / alimentos"].indexOf(secA) >= 0;
+    const riesgoMedio = ["Gastronomía / cafetería", "Energía / servicios técnicos"].indexOf(secA) >= 0;
+    let amb = riesgoAlto ? 45 : riesgoMedio ? 55 : 65;
+    const ambD = ["Riesgo ambiental propio del sector (" + escH(secA) + "): base " + amb];
+    const tra = window._tramites || null;
+    const estT = function (id) { return tra && tra.items ? (tra.items[id] || "pendiente") : "pendiente"; };
+    const pAmbL = { listo: 18, tramite: 9, na: 14, pendiente: 0 }[estT("ambiental")] || 0;
+    amb += pAmbL; ambD.push("Licencia Ambiental CITMA: " + estT("ambiental") + " (" + pAmbL + "/18)");
+    const pDes = { listo: 14, tramite: 7, na: 10, pendiente: 0 }[estT("desechos")] || 0;
+    amb += pDes; ambD.push("Manejo de desechos y residuales: " + estT("desechos") + " (" + pDes + "/14)");
+    const mitiga = tra && (tra.mitiga || tra.mitigacion) ? String(tra.mitiga || tra.mitigacion) : "";
+    if (mitiga.trim()) { amb += 5; ambD.push("Medidas de mitigación descritas (+5)"); }
+    const pRen = st.renov === "alta" ? 13 : st.renov === "parcial" ? 7 : 0;
+    amb += pRen; ambD.push("Energías renovables: " + (st.renov === "alta" ? "uso alto" : st.renov === "parcial" ? "uso parcial" : "sin uso declarado") + " (" + pRen + "/13)");
+    if (!tra) ambD.push("⚠️ Complete la tarjeta de trámites para afinar esta nota.");
+    amb = Math.max(0, Math.min(100, amb));
+    /* --- marco legal según el caso --- */
+    const normas = [];
+    if (mod === "plan") {
+      normas.push("Transformaciones Económicas y Sociales 2026 (176 medidas): para la inversión extranjera el PLAN DE NEGOCIO sustituye al estudio de factibilidad; la Comisión evalúa en 7 días y rige el silencio positivo (anuncio MINCEX, FIHAV 2025; nuevo reglamento de la Ley 118 en elaboración).");
+      normas.push("Ley 118/2014 de la Inversión Extranjera (modalidades y garantías).");
+    } else {
+      normas.push("Resolución Conjunta No. 1/2022 MINCEX-MEP: norma los estudios de factibilidad de los proyectos de inversión.");
+      normas.push("Decreto 327/2014: Reglamento del proceso inversionista (la factibilidad integra lo técnico, el mercado, el medio ambiente y lo económico-financiero).");
+    }
+    normas.push("Ley 150/2022 del Sistema de los Recursos Naturales y el Medio Ambiente.");
+    normas.push("Resolución CITMA 132/2009: Reglamento del proceso de Evaluación de Impacto Ambiental.");
+    if (/PDL/.test(gv("actorSel"))) normas.push("Decreto-Ley 174/2026: los Proyectos de Desarrollo Local se evalúan ante el CAM (incluye su impacto social y territorial).");
+    const viv = esVivienda(), incViv = viv && incluyeViv(st);
+    const vivD = [];
+    if (viv) {
+      normas.push("Ley 187/2026 de la Vivienda y Decreto 176/2026 (Reglamento General), Gaceta Oficial No. 86 de 2026, vigentes desde el 21 de octubre de 2026.");
+      vivD.push("Certificación catastral del inmueble vigente (Resolución INOTU 15/2026; vale 5 años — art. 18.4 del Decreto 176/2026) y valor catastral según la Resolución 16/2026.");
+      vivD.push("Licencia de construcción cuando la obra la requiera (la Ley 187, art. 22, exime ciertas intervenciones de conservación).");
+      if (incViv) {
+        const m2 = parseFloat(st.m2) || 0;
+        vivD.push("Vivienda adecuada (art. 12 del Decreto 176/2026): mínimo 25 m² útiles, acceso desde la vía pública, servicio sanitario y cocina." + (m2 > 0 ? (m2 >= 25 ? " Declarado: " + m2 + " m² ✔ cumple." : " Declarado: " + m2 + " m² ⚠️ POR DEBAJO del mínimo (salvo tolerancia del 10 % en remodelaciones).") : " Sin declarar la superficie: complétela en la tarjeta de Factibilidad integral."));
+      }
+      if (st.zona === "si") vivD.push("Zona con regulaciones especiales / patrimonial: autorización previa (arts. 271-272 del Decreto 176/2026)" + (ied ? " y estudio de impacto patrimonial (medida 126 de las Transformaciones 2026)." : "."));
+    }
+    /* --- veredicto integral --- */
+    let ver = "—", verCls = "";
+    if (r) {
+      const bloqReal = tra ? ["terr", "objeto", "registro"].some(function (id) { const e = estT(id); return e !== "listo" && e !== "na"; }) : false;
+      if (/NO FACTIBLE/.test(r.dict || "")) { ver = "🔴 NO FACTIBLE en lo económico: corrija primero la ruta a factible."; verCls = "bad"; }
+      else if (bloqReal) { ver = "⛔ Económicamente viable, pero NO PRESENTABLE aún: quedan trámites bloqueantes (ordenamiento, objeto social o registro)."; verCls = "bad"; }
+      else if (soc != null && soc >= 60 && amb >= 60) { ver = "🟢 INTEGRALMENTE SÓLIDO: económico, social y ambiental en verde."; verCls = "ok"; }
+      else { const debil = soc != null && soc < amb ? "lo social (" + soc + ")" : "lo ambiental (" + amb + ")"; ver = "🟡 VIABLE CON MEJORAS: refuerce " + debil + " antes de presentar."; verCls = "warn"; }
+    }
+    const salida = { mod: mod, ied: ied, social: soc, socialDet: socD, ambiental: amb, ambientalDet: ambD, normas: normas, vivienda: vivD, veredicto: ver, verCls: verCls, estado: st };
+    window._integral = salida;
+    return salida;
+  };
+  window.fcIntegralRender = function () {
+    const box = document.getElementById("intBox"); if (!box) return;
+    const st = leer();
+    const c = window.fcIntegralCalc();
+    const barra = function (v, col) { return "<div style='background:#e2e8f0;border-radius:6px;height:12px;overflow:hidden'><div style='height:100%;width:" + (v == null ? 0 : v) + "%;background:" + col + "'></div></div>"; };
+    let h = "";
+    h += "<div class='alert " + (c.mod === "plan" ? "warn" : "info") + "'><b>Modalidad que corresponde a este proyecto: " + (c.mod === "plan" ? "PLAN DE NEGOCIO" : "ESTUDIO DE FACTIBILIDAD") + "</b> — " + (c.mod === "plan" ? "hay cooperación / inversión extranjera (" + fmt(gn("fCoopIED")) + " CUP): las Transformaciones 2026 la sustituyen por el plan de negocio, con evaluación en 7 días y silencio positivo." : "sin capital extranjero: rige el estudio de factibilidad de la Resolución Conjunta 1/2022 MINCEX-MEP y el Decreto 327/2014.") + "</div>";
+    h += "<div class='grid2'><div><label class='f'>Dimensión social: <b>" + (c.social == null ? "genere el informe" : c.social + "/100") + "</b></label>" + barra(c.social, "#2563eb") + "<ul style='font-size:12.5px;margin:6px 0;padding-left:16px'>" + c.socialDet.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul></div>";
+    h += "<div><label class='f'>Dimensión ambiental: <b>" + c.ambiental + "/100</b></label>" + barra(c.ambiental, "#16a34a") + "<ul style='font-size:12.5px;margin:6px 0;padding-left:16px'>" + c.ambientalDet.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul></div></div>";
+    if (c.veredicto !== "—") h += "<div class='alert " + (c.verCls || "info") + "'><b>Factibilidad integral:</b> " + escH(c.veredicto) + "</div>";
+    h += "<div class='grid3'>";
+    h += "<div><label class='f' for='intMod'>Modalidad del documento</label><select id='intMod' onchange='fcIntSet()'><option value='auto'>Automática según el financiamiento</option><option value='fact'>Estudio de factibilidad</option><option value='plan'>Plan de negocio (IED)</option></select></div>";
+    h += "<div><label class='f' for='intRenov'>Uso de energías renovables</label><select id='intRenov' onchange='fcIntSet()'><option value='no'>Sin uso declarado</option><option value='parcial'>Parcial (apoyo solar, etc.)</option><option value='alta'>Alto (fuente principal)</option></select></div>";
+    h += "<div><label class='f' for='intZona'>¿Zona especial o patrimonial?</label><select id='intZona' onchange='fcIntSet()'><option value='no'>No</option><option value='si'>Sí (La Habana Vieja, etc.)</option></select></div></div>";
+    if (esVivienda()) {
+      h += "<div class='grid2'><div><label class='f' for='intViv'>¿El proyecto incluye viviendas?</label><select id='intViv' onchange='fcIntSet()'><option value='auto'>Detectar del texto del proyecto</option><option value='si'>Sí</option><option value='no'>No</option></select></div>";
+      h += "<div><label class='f' for='intM2'>Superficie útil por vivienda (m²) — mínimo legal 25</label><input type='number' id='intM2' min='0' step='0.5' oninput='fcIntSet()' placeholder='Ej.: 32'></div></div>";
+      h += "<div class='alert info'><b>Decreto 176/2026 aplicado a este proyecto:</b><ul style='margin:4px 0;padding-left:16px'>" + c.vivienda.map(function (x) { return "<li>" + escH(x) + "</li>"; }).join("") + "</ul></div>";
+    }
+    h += "<details style='margin-top:6px'><summary style='cursor:pointer;font-size:13px'><b>Marco legal aplicado automáticamente (" + c.normas.length + " normas)</b></summary><ul style='font-size:12.5px;padding-left:16px'>" + c.normas.map(function (x) { return "<li>" + escH(x) + "</li>"; }).join("") + "</ul></details>";
+    box.innerHTML = h;
+    const set = function (id, v) { const el = document.getElementById(id); if (el) el.value = v; };
+    set("intMod", st.mod); set("intRenov", st.renov); set("intZona", st.zona); set("intViv", st.viv); set("intM2", st.m2);
+  };
+  window.fcIntSet = function () {
+    const st = leer();
+    const g = function (id) { const el = document.getElementById(id); return el ? el.value : null; };
+    if (g("intMod") != null) st.mod = g("intMod");
+    if (g("intRenov") != null) st.renov = g("intRenov");
+    if (g("intZona") != null) st.zona = g("intZona");
+    if (g("intViv") != null) st.viv = g("intViv");
+    if (g("intM2") != null) st.m2 = g("intM2");
+    guardar(st); window.fcIntegralRender();
+  };
+  window.addEventListener("load", function () {
+    const ancla = document.getElementById("docCard") || document.getElementById("detCard") || document.getElementById("tramCard");
+    if (ancla && !document.getElementById("intCard")) {
+      ancla.insertAdjacentHTML("beforebegin", "<div class='card' id='intCard'><h3>⚖️ Factibilidad integral 2026 — social, ambiental y legal</h3><div class='hint'>Un estudio no es solo números: la normativa cubana exige mirar también el impacto social y el ambiental, y desde 2026 la modalidad cambia si hay inversión extranjera. Todo se calcula solo con lo que la app ya sabe; ajuste solo los tres datos de abajo.</div><div id='intBox'></div></div>");
+      window.fcIntegralRender();
+    }
+  });
+  if (typeof generarInforme === "function") {
+    const gi0 = generarInforme;
+    generarInforme = function () { const r = gi0.apply(this, arguments); try { window.fcIntegralRender(); } catch (e) {} return r; };
+  }
+  if (typeof fcDocConstruir === "function") {
+    const fd0 = fcDocConstruir;
+    fcDocConstruir = function () {
+      let h = fd0.apply(this, arguments);
+      const c = window.fcIntegralCalc();
+      if (c.mod === "plan") h = h.replace("<h1>Estudio de factibilidad técnico-económica</h1>", "<h1>Plan de negocio</h1><p><i>Modalidad 2026 para proyectos con inversión extranjera: sustituye al estudio de factibilidad (Transformaciones Económicas y Sociales, 176 medidas; evaluación en 7 días y silencio positivo).</i></p>");
+      h += "<h2>10. Factibilidad integral: dimensión social, ambiental y marco legal</h2>";
+      h += "<p><b>Dimensión social: " + (c.social == null ? "sin evaluar" : c.social + "/100") + "</b> · <b>Dimensión ambiental: " + c.ambiental + "/100</b></p>";
+      h += "<p>" + escH(c.veredicto) + "</p>";
+      h += "<p><b>Marco legal aplicado:</b></p><ul>" + c.normas.map(function (x) { return "<li>" + escH(x) + "</li>"; }).join("") + "</ul>";
+      if (c.vivienda.length) h += "<p><b>Vivienda y construcción (Ley 187/2026 y Decreto 176/2026):</b></p><ul>" + c.vivienda.map(function (x) { return "<li>" + escH(x) + "</li>"; }).join("") + "</ul>";
+      const box = document.getElementById("docOficial");
+      if (box) { box.innerHTML = h; box.style.display = "block"; }
+      return h;
+    };
+  }
+})();
 </script>
