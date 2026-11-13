@@ -4194,16 +4194,20 @@ try {
         });
         if (manuales.length) notas.push("Respetó " + manuales.length + " campo(s) que usted editó a mano: el agente no los toca.");
       }
-      /* 4 · precios de mercado → precio de venta (mediana real) */
-      if (vacio("precio") && typeof buscarPrecios === "function") {
+      /* 4 · precios de mercado → precio de venta (mediana real, consultas CORTAS por producto) */
+      if (vacio("precio")) {
         try {
-          const pb = $("precioQuery");
-          if (pb && !pb.value.trim() && typeof webQueryAuto === "function") pb.value = webQueryAuto();
-          else if (pb && !pb.value.trim()) pb.value = (($("sectorSel") || {}).value || "") + " " + (($("muniSel") || {}).value || "") + " Cuba precio";
-          window._precios = null;
-          buscarPrecios();
-          for (let i = 0; i < 30; i++) { await new Promise(function (r) { setTimeout(r, 900); }); if (window._precios && window._precios.mediana > 0) break; }
-          if (window._precios && window._precios.mediana > 0) poner("precio", window._precios.mediana, "mediana de " + (window._precios.n || "varios") + " anuncios reales del mercado (Revolico/web) — VERIFICAR", rep);
+          if (typeof window.fcMedianaProducto === "function") {
+            const mp = await window.fcMedianaProducto();
+            if (mp && mp.mediana > 0) { poner("precio", mp.mediana, "mediana de " + mp.n + " anuncios reales de «" + mp.producto + "» en Revolico (precio informal) — VERIFICAR", rep); if (typeof window.fcAplicarPrecios === "function") window.fcAplicarPrecios(mp, {}); }
+          } else if (typeof buscarPrecios === "function") {
+            const pb = $("precioQuery");
+            if (pb && !pb.value.trim()) pb.value = (typeof PRECIO_KEYWORDS !== "undefined" && PRECIO_KEYWORDS[$("sectorSel").value]) || "oferta";
+            window._precios = null; buscarPrecios();
+            for (let i = 0; i < 20; i++) { await new Promise(function (r) { setTimeout(r, 700); }); if (window._precios && window._precios.items) break; }
+            const cups = ((window._precios || {}).items || []).map(function (x) { return x.cup; }).filter(isFinite).sort(function (a, b) { return a - b; });
+            if (cups.length) poner("precio", cups[Math.floor(cups.length / 2)], "mediana de anuncios reales (Revolico/web) — VERIFICAR", rep);
+          }
         } catch (e) {}
       }
       /* 5 · ingreso medio desde el salario del territorio */
@@ -4484,6 +4488,142 @@ try {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(montar, 3200); });
   else setTimeout(montar, 3200);
   setTimeout(montar, 8000);
+})();
+</script>
+
+<script>
+/* ===== PRECIOS VIVOS (fcPreciosVivos) =====
+   Los precios informales reales se buscan SOLOS y se MANTIENEN:
+   - Motor por producto: consultas CORTAS a Revolico («pizza»), nunca
+     la frase larga del sector+territorio (eso no devuelve anuncios).
+   - Al abrir la app y al cambiar provincia/municipio/sector, si el
+     dato tiene más de 12 h, se refresca: mediana del producto →
+     precio informal de referencia (sigue al mercado) y, si está
+     vacío, precio de venta sugerido; tasas y combustibles se
+     sincronizan; salario medio y alquiler del territorio se revisan.
+   - Lo aprendido se comparte por la hoja Autodatos (Sheets): un
+     equipo aprovecha el precio fresco que buscó el otro.
+   - Lo que Leonardo edita a mano (dataset.fcManual) NUNCA se toca;
+     su precio de venta solo se rellena si está vacío. */
+(function () {
+  const LS = "facticuba_precios_vivos_v1";
+  const HORAS = 12;
+  const EXTRA = { "Gastronomía / cafetería": ["pizza", "hamburguesa", "café"], "Comercio minorista": ["ropa", "zapatos", "perfume"], "Manufactura ligera": ["mueble", "colchón", "puerta"], "Servicios profesionales / digitales": ["laptop", "impresión", "disco duro"], "Turismo / alojamiento": ["hostal", "habitación en alquiler", "casa particular"], "Agro / alimentos": ["queso", "arroz", "cerdo"], "Construcción / mantenimiento": ["cemento", "pintura", "arena"], "Transporte / mensajería": ["moto eléctrica", "bicicleta eléctrica", "goma de moto"], "Belleza / salud": ["uñas", "tinte de pelo", "peluquería"], "Energía / servicios técnicos": ["panel solar", "batería", "inversor"], "Otro": ["oferta"] };
+  const DICC = ["pizza", "hamburguesa", "café", "hostal", "uñas", "cemento", "panel solar", "moto eléctrica", "queso", "ropa", "mueble", "laptop", "arroz", "peluquería", "inversor", "batería", "colchón", "cerdo"];
+  function $(id) { return document.getElementById(id); }
+  function esc(x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); }
+  function norm(x) { return (typeof normSinTilde === "function") ? normSinTilde(String(x || "")) : String(x || "").toLowerCase(); }
+  function espera(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function textoSel(id) { const e = $(id); if (!e) return ""; return (e.selectedOptions && e.selectedOptions[0] ? e.selectedOptions[0].textContent : e.value || "").trim(); }
+  function territorio() { return { prov: textoSel("provSel"), mun: textoSel("muniSel"), sector: ($("sectorSel") || {}).value || "" }; }
+  function clave() { const t = territorio(); return [t.prov, t.mun, t.sector].join("|"); }
+  function leerCache() { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; } }
+  function guardarCache(o) { try { localStorage.setItem(LS, JSON.stringify(o)); } catch (e) {} }
+  function fresco(f) { return !!f && (Date.now() - new Date(f).getTime() < HORAS * 3600 * 1000); }
+  function candidatos() {
+    const sec = ($("sectorSel") || {}).value || "";
+    const lista = [];
+    const texto = norm((($("nomProy") || {}).value || "") + " " + (($("descProy") || {}).value || ""));
+    DICC.forEach(function (w) { if (texto.indexOf(norm(w)) >= 0) lista.push(w); });
+    if (typeof PRECIO_KEYWORDS !== "undefined" && PRECIO_KEYWORDS[sec]) lista.push(PRECIO_KEYWORDS[sec]);
+    (EXTRA[sec] || []).forEach(function (w) { lista.push(w); });
+    return lista.filter(function (v, i) { return lista.indexOf(v) === i; }).slice(0, 4);
+  }
+  window.fcMedianaProducto = async function () {
+    const cands = candidatos();
+    for (const cand of cands) {
+      try {
+        const items = await srcRevolicoEspejo(cand);
+        const det = [];
+        (items || []).forEach(function (x) { const cup = aCUP(x.precio, x.moneda); if (cup && cup >= 20 && cup <= 5000000) det.push({ titulo: x.titulo, precio: x.precio, moneda: x.moneda, cup: Math.round(cup), fuente: x.fuente, url: x.url }); });
+        if (det.length >= 3) { const cups = det.map(function (d) { return d.cup; }).sort(function (a, b) { return a - b; }); return { producto: cand, mediana: cups[Math.floor(cups.length / 2)], n: det.length, items: det.slice(0, 15) }; }
+      } catch (e) {}
+    }
+    return null;
+  };
+  function ponerAuto(id, valor, fuente) {
+    const e = $(id); if (!e || !(valor > 0)) return false;
+    if (e.dataset.fcManual) return false;
+    const vacio = !e.value || Number(e.value) === 0;
+    if (!vacio && !e.dataset.fcAuto) return false;
+    if (!vacio && Math.round(Number(e.value)) === Math.round(valor)) { e.dataset.fcAuto = "precios"; return false; }
+    e.value = Math.round(valor); e.dataset.fcAuto = "precios"; e.title = fuente + " — se actualiza solo; si lo edita a mano, queda fijo suyo.";
+    return true;
+  }
+  window.fcAplicarPrecios = function (mp) {
+    if (!mp || !(mp.mediana > 0)) return false;
+    let cambio = ponerAuto("refInformal", mp.mediana, "Precio informal real: mediana de " + mp.n + " anuncios de «" + mp.producto + "» en Revolico (" + new Date().toLocaleDateString("es-CU") + ")");
+    const ep = $("precio");
+    if (ep && !ep.dataset.fcManual && (!ep.value || Number(ep.value) === 0)) { ep.value = Math.round(mp.mediana); ep.dataset.fcAuto = "precios"; ep.title = "Precio sugerido por la mediana real de «" + mp.producto + "» — ajústelo a su estrategia."; cambio = true; }
+    const pq = $("precioQuery"); if (pq && !pq.dataset.fcManual) pq.value = mp.producto;
+    window._precios = { fecha: new Date().toISOString(), query: mp.producto, items: mp.items || [], total: mp.n || 0, mediana: mp.mediana };
+    try { localStorage.setItem("facticuba_precios_v1", JSON.stringify(window._precios)); } catch (e) {}
+    if (typeof pintarPrecios === "function") pintarPrecios();
+    if (cambio) { if (typeof actualizarComparador === "function") actualizarComparador(); if (typeof autoRegen === "function") autoRegen(); }
+    return cambio;
+  };
+  function linea(html) { const el = $("pvLinea"); if (el) el.innerHTML = html; }
+  function sesion() { try { return typeof checkSession === "function" && checkSession(); } catch (e) { return false; } }
+  async function refrescar(forzar) {
+    const t = territorio();
+    if (!t.sector) return;
+    const cl = clave(), cache = leerCache();
+    if (!forzar && cache.clave === cl && fresco(cache.fecha) && cache.mediana > 0) {
+      linea("🟢 <b>Precios vivos</b> al día (" + new Date(cache.fecha).toLocaleString("es-CU") + "): mediana de «" + esc(cache.producto) + "» = <b>" + fmt(cache.mediana) + " CUP</b>" + (cache.n ? " (" + cache.n + " anuncios)" : "") + ". Se revisan solos cada " + HORAS + " h y al cambiar de territorio o sector; lo editado a mano no se toca.");
+      return;
+    }
+    linea("🔎 <b>Precios vivos:</b> buscando precios reales actuales del territorio…");
+    const notas = [];
+    let mp = null;
+    try {
+      if (sesion() && typeof fcApi === "function") {
+        const j = await fcApi("autodatos_get", { provincia: t.prov, municipio: t.mun, sector: t.sector });
+        if (j && j.ok) {
+          const it = (j.items || []).filter(function (x) { return x.campo === "precioInformal"; })[0];
+          const ayer = new Date(Date.now() - 36 * 3600 * 1000).toISOString().slice(0, 10);
+          if (it && Number(it.valor) > 0 && String(it.fecha || "") >= ayer) {
+            const m = String(it.fuente || "").match(/«([^»]+)»/);
+            mp = { producto: m ? m[1] : "mercado local", mediana: Number(it.valor), n: 0, items: [], desdeNube: true };
+          }
+        }
+      }
+    } catch (e) {}
+    if (!mp) { try { mp = await window.fcMedianaProducto(); } catch (e) {} }
+    if (mp && mp.mediana > 0) {
+      if (mp.desdeNube) { ponerAuto("refInformal", mp.mediana, "Precio informal aprendido y compartido en la hoja Autodatos"); const pq = $("precioQuery"); if (pq && !pq.dataset.fcManual && mp.producto !== "mercado local") pq.value = mp.producto; }
+      else window.fcAplicarPrecios(mp);
+      guardarCache({ clave: cl, fecha: new Date().toISOString(), producto: mp.producto, mediana: mp.mediana, n: mp.n });
+      notas.push("mediana de «" + mp.producto + "» = <b>" + fmt(mp.mediana) + " CUP</b>" + (mp.n ? " (" + mp.n + " anuncios de hoy)" : " (aprendida en la hoja)"));
+      if (!mp.desdeNube && sesion() && typeof fcApi === "function") {
+        try { const pp = fcApi("autodatos_set", { items: [{ provincia: t.prov, municipio: t.mun, sector: t.sector, campo: "precioInformal", valor: mp.mediana, fuente: "Revolico: mediana de «" + mp.producto + "»" }] }); if (pp && pp.catch) pp.catch(function () {}); } catch (e) {}
+      }
+    } else notas.push("sin mediana clara hoy para este sector (no se inventa: queda lo que había)");
+    try { if (typeof sincronizarTasas === "function") { await Promise.race([sincronizarTasas(false), espera(25000)]); notas.push("tasas y combustibles sincronizados"); } } catch (e) {}
+    try {
+      const faltaSal = !(Number(val("salMedio")) > 0) || !!($("salMedio") || {}).dataset?.fcAuto;
+      const faltaAlq = !(Number(val("fijoAlquiler")) > 0) || !!($("fijoAlquiler") || {}).dataset?.fcAuto;
+      if (typeof fcRespaldoInternet === "function" && (faltaSal || faltaAlq)) { await Promise.race([fcRespaldoInternet(), espera(45000)]); notas.push("salario medio y alquiler del territorio revisados"); }
+    } catch (e) {}
+    linea("🟢 <b>Precios vivos</b> actualizados (" + new Date().toLocaleString("es-CU") + "): " + notas.join(" · ") + ". Lo que usted edite a mano queda fijo y no se toca.");
+    if (typeof window.fcLogAgente === "function") window.fcLogAgente("PreciosVivos", "refresco", notas.join(" · ").replace(/<[^>]+>/g, "").slice(0, 200), "ok");
+  }
+  window.fcPreciosVivos = refrescar;
+  let tempor = null;
+  function montar() {
+    const st = $("precioStatus");
+    if (st && !$("pvLinea")) {
+      const bar = document.createElement("div");
+      bar.className = "alert ok"; bar.style.margin = "8px 0";
+      bar.innerHTML = "<span id='pvLinea'>🟢 <b>Precios vivos:</b> se buscan solos y se mantienen actuales…</span> <button type='button' class='btn btn-d' id='pvBtn' style='margin-left:8px'>↻ Actualizar precios ahora</button>";
+      st.parentNode.insertBefore(bar, st);
+      $("pvBtn").addEventListener("click", function () { refrescar(true); });
+    }
+    ["provSel", "muniSel", "sectorSel"].forEach(function (id) { const e = $(id); if (e && !e.dataset.pvEscucha) { e.dataset.pvEscucha = "1"; e.addEventListener("change", function () { clearTimeout(tempor); tempor = setTimeout(function () { refrescar(false); }, 1800); }); } });
+    setTimeout(function () { refrescar(false); }, 7000);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(montar, 4000); });
+  else setTimeout(montar, 4000);
+  setTimeout(montar, 10000);
 })();
 </script>
 
