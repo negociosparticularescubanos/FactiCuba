@@ -427,12 +427,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
          <span class="hint" id="iaStatus">La IA redacta en vivo con sus datos; los números los calcula el motor.</span>
        </div>
         <h3>🔎 Investigación web real + IA con fuentes (todo verificado)</h3>
-        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio) y luego la IA redacta <b>apoyándose solo en esas fuentes</b>, citándolas. Nada se inventa: cada dato web muestra su enlace y fecha de consulta. Sin claves funciona con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue; con clave gratuita de <b>Brave</b> o <b>Tavily</b> añade búsqueda web general.</div>
+        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio) y luego la IA redacta <b>apoyándose solo en esas fuentes</b>, citándolas. Nada se inventa: cada dato web muestra su enlace y fecha de consulta. Funciona sin claves con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue.</div>
         <label class="f" for="webQuery">Consulta de búsqueda (se genera sola, edítela si quiere)</label>
         <input type="text" id="webQuery" placeholder="Ej: cafetería Santa Clara Cuba precios 2026">
         <div class="row">
-          <div><label class="f" for="braveKey">Clave Brave Search (opcional, gratis en brave.com/search/api; solo este navegador)</label><input type="password" id="braveKey" autocomplete="off" placeholder="BSA-..."></div>
-          <div><label class="f" for="tavilyKey">Clave Tavily (opcional, gratis en tavily.com; solo este navegador)</label><input type="password" id="tavilyKey" autocomplete="off" placeholder="tvly-..."></div>
         </div>
         <div class="row">
           <div><label class="f" for="webUrl">Traer texto de una URL concreta (ONEI, BCC, elToque, prensa…)</label><input type="text" id="webUrl" placeholder="Pegue https://… y pulse «Traer URL»"></div>
@@ -1813,10 +1811,7 @@ async function redactarIA(){
   }catch(e){ if(st) st.textContent="⚠️ La IA no respondió: redacte a mano."; }
 }
 /* ---- Investigación web real + IA fundamentada (fuentes verificables) ---- */
-const WEBKEY="facticuba_webkeys_v1";
 function escH(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function webKeys(){ try{ return JSON.parse(localStorage.getItem(WEBKEY))||{}; }catch(e){ return {}; } }
-function webKeysSave(o){ try{ localStorage.setItem(WEBKEY,JSON.stringify(o)); }catch(e){} }
 function webQueryAuto(){
   const cur=($("webQuery")&&$("webQuery").value||"").trim();
   if(cur) return cur;
@@ -1844,25 +1839,6 @@ async function wikiResumen(titulo){
   }catch(e){}
   return null;
 }
-async function braveBuscar(q,key){
-  const u="https://api.search.brave.com/res/v1/web/search?q="+encodeURIComponent(q)+"&count=5&search_lang=es&text_decorations=0";
-  const r=await fetchTexto(u,15000,{headers:{"X-Subscription-Token":key,"Accept":"application/json"}});
-  if(!r.txt) throw new Error(r.error||"sin respuesta");
-  const j=JSON.parse(r.txt);
-  const arr=(j.web&&j.web.results)||j.results||[];
-  return arr.slice(0,5).map(function(x){
-    return {fuente:"Brave Search",titulo:x.title||x.url,extracto:String(x.description||x.snippet||"").slice(0,280),url:x.url,via:r.via};
-  });
-}
-async function tavilyBuscar(q,key){
-  const r=await fetchTexto("https://api.tavily.com/search",15000,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({api_key:key,query:q,max_results:5,search_depth:"basic",include_answer:false})});
-  if(!r.txt) throw new Error(r.error||"sin respuesta");
-  const j=JSON.parse(r.txt);
-  const arr=j.results||[];
-  return arr.slice(0,5).map(function(x){
-    return {fuente:"Tavily",titulo:x.title||x.url,extracto:String(x.content||x.snippet||"").slice(0,280),url:x.url,via:r.via};
-  });
-}
 function pintarWeb(){
   const box=$("webResults"), st=$("webStatus");
   const w=window._web;
@@ -1881,12 +1857,9 @@ async function buscarWebReal(){
   const st=$("webStatus");
   const q=webQueryAuto();
   if($("webQuery")) $("webQuery").value=q;
-  const bk=(($("braveKey")&&$("braveKey").value)||webKeys().brave||"").trim();
-  const tk=(($("tavilyKey")&&$("tavilyKey").value)||webKeys().tavily||"").trim();
-  webKeysSave({brave:bk,tavily:tk});
   if(typeof navigator!=="undefined"&&!navigator.onLine){ if(st) st.textContent="⚠️ Sin conexión: la investigación web necesita internet para datos en vivo."; return; }
   if(st){ st.dataset.spin="1"; }
-  let dots=0; const spin=setInterval(function(){ dots=(dots+1)%4; if(st) st.textContent="🔎 Buscando información real…"+"·".repeat(dots+1)+" (web sin claves + Wikipedia"+(bk?" + Brave":"")+(tk?" + Tavily":"")+")."; },350);
+  let dots=0; const spin=setInterval(function(){ dots=(dots+1)%4; if(st) st.textContent="🔎 Buscando información real…"+"·".repeat(dots+1)+" (buscador web + Wikipedia)."; },350);
   const items=[], notas=[];
   const queries=[q, $("sectorSel").value+" Cuba 2026", $("muniSel").value+" "+$("provSel").value+" Cuba"];
     try{
@@ -1909,14 +1882,6 @@ async function buscarWebReal(){
     if(items.length){
       try{ const extra=await wikiResumen(items[0].titulo); if(extra) items[0].extracto=(items[0].extracto+" — "+extra).slice(0,600); }catch(e){}
     }
-    if(bk){
-      try{ const r=await braveBuscar(q,bk); r.forEach(function(x){ items.push(x); }); notas.push("Brave: "+r.length); }
-      catch(e){ notas.push("Brave: "+String(e.message||e).slice(0,90)); }
-    } else notas.push("Brave: sin clave (opcional)");
-    if(tk){
-      try{ const r=await tavilyBuscar(q,tk); r.forEach(function(x){ items.push(x); }); notas.push("Tavily: "+r.length); }
-      catch(e){ notas.push("Tavily: "+String(e.message||e).slice(0,90)); }
-    } else notas.push("Tavily: sin clave (opcional)");
     const seen={}, uniq=[];
     items.forEach(function(x){ const k=String(x.url||"").toLowerCase(); if(!k||seen[k]) return; seen[k]=1; uniq.push(x); });
     window._web={fecha:new Date().toISOString(),query:q,notas:notas,items:uniq.slice(0,12)};
@@ -2449,7 +2414,7 @@ function preSec(r){
   return h+"</table></div><p class='hint'>*Con su capacidad/ocupación y costos actuales. Precio informal de referencia usado en el comparador: "+fmt(r.refInformal)+" CUP.</p></div>";
 }
 function webSec(r){
-  const w=r.fuentesWeb;  if(!w||!w.items||!w.items.length) return "<div class='card' style='box-shadow:none'><h3>🌐 5 · Fuentes web reales consultadas</h3><p style='font-size:13.5px'>Sin investigación web en este informe. En el paso 2, pulse <b>«Buscar información real del proyecto»</b> para añadir fuentes verificables (Wikipedia / Brave / Tavily / URL aportada) y regenere el informe.</p></div>";
+  const w=r.fuentesWeb;  if(!w||!w.items||!w.items.length) return "<div class='card' style='box-shadow:none'><h3>🌐 5 · Fuentes web reales consultadas</h3><p style='font-size:13.5px'>Sin investigación web en este informe. En el paso 2, pulse <b>«Buscar información real del proyecto»</b> para añadir fuentes verificables (buscador web / Wikipedia / URL aportada) y regenere el informe.</p></div>";
   const f=new Date(w.fecha).toLocaleString("es-CU");
   let h="<div class='card' style='box-shadow:none'><h3>🌐 5 · Fuentes web reales consultadas ("+w.items.length+") <span class='tag info'>"+escH(f)+"</span></h3>";
   h+="<p style='font-size:13.5px'>Consulta: «"+escH(w.query)+"». La IA del paso 2 solo usó estos textos como contexto; los números del informe los calcula el motor y no vienen de la web. Verifique la vigencia antes de decidir.</p><div class='tblwrap'><table class='t'><tr><th>#</th><th>Fuente</th><th>Título / extracto</th></tr>";
@@ -2776,7 +2741,6 @@ document.addEventListener("input",function(e){ if(e.target.closest && e.target.c
 document.addEventListener("change",function(e){ if(e.target.closest && e.target.closest("#s1,#s2")){ actualizarAsistente(); autoRegen(); } });
 try{
   const t0=localStorage.getItem(TOK_KEY); if(t0&&$("tokInput")) $("tokInput").value=t0;
-  try{ const wk=JSON.parse(localStorage.getItem(WEBKEY)||"{}"); if(wk.brave&&$("braveKey")) $("braveKey").value=wk.brave; if(wk.tavily&&$("tavilyKey")) $("tavilyKey").value=wk.tavily; }catch(e2){}
   try{ const rw=JSON.parse(localStorage.getItem("facticuba_research_v1")||"null"); if(rw&&rw.items&&rw.items.length){ window._web=rw; } }catch(e2){}
   try{ const rp=JSON.parse(localStorage.getItem("facticuba_precios_v1")||"null"); if(rp&&rp.items&&rp.items.length){ window._precios=rp; } }catch(e2){}
   const c=JSON.parse(localStorage.getItem(TASAS_CACHE_KEY)||"null");
@@ -3640,17 +3604,15 @@ function fcExtraPlan(txt) {
 </script>
 
 <script>
-/* ===== SIN IA (2026-11-12) =====
-   Por orden del dueño, los datos salen SOLO de búsquedas web reales
-   (buscador espejo, Wikipedia, Revolico y las tasas). Limpieza única:
-   borra de este navegador las claves de IA que versiones anteriores
-   pudieron guardar. */
+/* ===== SIN CLAVES (2026-11-12) =====
+   Por orden del dueño, la app no usa claves de IA ni de buscadores:
+   los datos salen de búsquedas web abiertas (buscador espejo, Wikipedia,
+   Revolico y las tasas). Limpieza única: borra de este navegador la
+   bolsa de claves que versiones anteriores pudieron guardar. */
 try {
-  if (!localStorage.getItem("facticuba_sin_ia_v1")) {
-    const wk = JSON.parse(localStorage.getItem("facticuba_webkeys_v1") || "{}");
-    delete wk.gemini; delete wk.pollinations;
-    localStorage.setItem("facticuba_webkeys_v1", JSON.stringify(wk));
-    localStorage.setItem("facticuba_sin_ia_v1", "1");
+  if (!localStorage.getItem("facticuba_sin_claves_v1")) {
+    localStorage.removeItem("facticuba_webkeys_v1");
+    localStorage.setItem("facticuba_sin_claves_v1", "1");
   }
 } catch (e) {}
 </script>
