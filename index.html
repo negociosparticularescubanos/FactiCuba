@@ -4771,3 +4771,180 @@ try {
 })();
 </script>
 
+<style>
+.pt-bar{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.pt-b{border:1.5px solid #b9c6dd;background:#eef2f9;color:#20365e;border-radius:999px;padding:7px 13px;font-weight:700;cursor:pointer;font-size:.92rem}
+.pt-b.on{background:#20509e;border-color:#20509e;color:#fff}
+.pt-panel{display:none}.pt-panel.on{display:block}
+.pt-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0}
+.pt-kpi{background:#f4f7fc;border:1px solid #dbe3f0;border-radius:10px;padding:8px 10px}
+.pt-kpi b{font-size:1.05rem;display:block}
+.pt-sem{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0}
+.pt-falta{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid #ecc9c9;background:#fdf3f3;border-radius:8px;padding:6px 9px;margin:5px 0}
+</style>
+<script>
+/* ===== TU ESTUDIO POR PESTAÑAS (fcPestanas) =====
+   Auditoría UX 2026-11-13: los resultados se RE-PRESENTAN en una
+   sola casa con 5 pestañas (Resumen · Mercado ONEI · Operaciones ·
+   Finanzas · Plan de acción). El motor no se toca: cada cifra se
+   lee de lo ya calculado (ultimoResultado, _encaje, _bancaria,
+   _tramites, _integral, _prioridades, _escenarios) y aparece UNA
+   vez, con su explicación en lenguaje simple. La pestaña 5 trae la
+   auditoría de datos obligatorios faltantes por apartados, con
+   botón que lleva directo al campo. */
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function esc(x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); }
+  function V(id) { return (typeof val === "function") ? (Number(val(id)) || 0) : 0; }
+  function T(id) { const e = $(id); return e ? String(e.value || "").trim() : ""; }
+  function R() { try { return ultimoResultado || null; } catch (e) { return null; } }
+  const SIN = "<p class='hint'>Genera el informe (botón «Calcular») y esta vista se llena sola con tu estudio.</p>";
+
+  function kpi(etiqueta, valor, gloss) { return "<div class='pt-kpi'><span class='hint'>" + etiqueta + "</span><b>" + valor + "</b><span class='hint'>" + gloss + "</span></div>"; }
+  function sema(etiqueta, puntos, texto) {
+    const c = puntos == null ? "#9aa7bd" : puntos >= 65 ? "#1d9e75" : puntos >= 45 ? "#d99a16" : "#c64b4b";
+    return "<span>● <b>" + etiqueta + ":</b> " + (puntos == null ? (texto || "—") : "<span style='color:" + c + ";font-weight:800'>" + Math.round(puntos) + "/100</span>") + "</span>";
+  }
+
+  function panelResumen() {
+    const r = R(); if (!r) return SIN;
+    let I = null; try { I = window._integral || (typeof fcIntegralCalc === "function" ? fcIntegralCalc() : null); } catch (e) {}
+    const inv = (typeof invInicialCUP === "function") ? invInicialCUP() : 0;
+    const esF = /FACTIBLE/.test(r.dict || "") && !/NO FACTIBLE/.test(r.dict || "");
+    let h = "<h4 style='margin:4px 0'>" + esc(T("nomProy") || "Tu proyecto") + " · " + esc(T("muniSel")) + ", " + esc(T("provSel")) + "</h4>";
+    h += "<p style='font-size:1.08rem;margin:4px 0'>Dictamen: <b style='color:" + (esF ? "#177a57" : "#b33939") + "'>" + esc(r.dict || "—") + "</b></p>";
+    h += "<div class='pt-sem'>" + sema("Económico", esF ? 78 : 30, r.dict) + sema("Social", I ? I.social : null) + sema("Ambiental", I ? I.ambiental : null) + "</div>";
+    if (I && (I.veredicto || I.dictamen)) h += "<p class='hint'>" + esc(I.veredicto || I.dictamen) + "</p>";
+    h += "<div class='pt-kpis'>"
+      + kpi("Inversión total", fmt(inv) + " CUP", "todo lo que hay que poner para arrancar")
+      + kpi("Utilidad mensual", fmt(r.utilNeta) + " CUP", "lo que queda limpio cada mes, tras costos e impuestos")
+      + kpi("VAN (3 años)", fmt(r.van) + " CUP", "lo que vale hoy tu proyecto ya recuperada la inversión: si es positivo, crea valor")
+      + kpi("TIR", fmt1((r.tir || 0) * 100) + " %", "el rendimiento anual de tu dinero; debe superar el " + fmt1(V("eTasa") || 12) + " % que cobra el tiempo")
+      + kpi("Recuperas en", (r.e5 && r.e5.priM ? r.e5.priM + " meses" : "—"), "tiempo para devolver lo invertido con las ganancias (PRI simple)")
+      + kpi("PRI descontado", (window._escenarios && window._escenarios.priDescontadoAnios ? fmt1(window._escenarios.priDescontadoAnios) + " años" : "—"), "lo mismo, pero contando que el dinero de mañana vale menos que el de hoy")
+      + "</div>";
+    if (window._prioridades) h += "<p>🎯 <b>Alineación con las prioridades del país: " + window._prioridades.promedio + "/100 (" + window._prioridades.nivel + ")</b> — detalle en la tarjeta de Metodología.</p>";
+    h += "<p class='hint'>En una frase: " + (esF ? "el proyecto gana dinero y se sostiene; revisa el plan de acción para presentarlo fuerte." : "tal como está, el proyecto no se sostiene; la pestaña «Plan de acción» te dice qué cambiar.") + "</p>";
+    return h;
+  }
+
+  function panelMercado() {
+    const r = R(); if (!r) return SIN;
+    const E = window._encaje || null, P = window._precios || null;
+    let h = "<h4 style='margin:4px 0'>Tu mercado en " + esc(T("muniSel")) + " (datos ONEI)</h4>";
+    if (E) {
+      h += "<p>👥 Población: <b>" + fmt(E.poblacion) + " habitantes</b> (Censo 2022). Demanda estimada de tu sector: <b>" + fmt(E.demandaEstimada) + " und/mes</b>. Tu proyecto vendería <b>" + fmt(E.unidadesProyecto) + " und/mes</b> → " + esc(E.escalaTxt || "") + ".</p>";
+      h += "<p>🧭 Encaje con el Plan municipal: <b>" + esc(E.planNivel || "—") + "</b> (" + (E.planAciertos || 0) + " de " + (E.planChequeos || 0) + " chequeos cumplidos).</p>";
+      if (E.huecos && E.huecos.length) h += "<p>⚠️ Huecos frente al plan: " + E.huecos.map(esc).join(" · ") + "</p>";
+      if (E.sugerencias && E.sugerencias.length) h += "<ul>" + E.sugerencias.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+    } else h += "<p class='hint'>El encaje territorial (población, demanda y Plan municipal) se completa solo al analizar el territorio; si aún no sale, genera el informe de nuevo.</p>";
+    h += "<h4>Precios (una sola vez, aquí)</h4><p>Tu precio: <b>" + fmt(V("precio")) + " CUP</b>. ";
+    if (P && P.mediana) h += "Precio real de mercado hoy (mediana de anuncios): <b>" + fmt(P.mediana) + " CUP</b>" + (P.producto ? " para «" + esc(P.producto) + "»" : "") + ". ";
+    if (V("refFormal")) h += "Referencia estatal: " + fmt(V("refFormal")) + " CUP. ";
+    if (V("refInformal")) h += "Referencia informal: " + fmt(V("refInformal")) + " CUP.";
+    h += "</p><p class='hint'>Capacidad que usarás: " + fmt(V("capacidad")) + " und/mes al " + fmt1(V("ocupacion")) + " % → vendes unas " + fmt(r.und) + " und/mes.</p>";
+    return h;
+  }
+
+  function panelOperaciones() {
+    const r = R(); if (!r) return SIN;
+    const D = window._detalle || null, TR = window._tramites || null;
+    let h = "<h4 style='margin:4px 0'>Cómo va a funcionar</h4>";
+    h += "<p>🏭 Producción/servicio: <b>" + fmt(r.und) + " und/mes</b> (capacidad " + fmt(V("capacidad")) + " al " + fmt1(V("ocupacion")) + " %). 👥 Equipo: <b>" + fmt(V("numTrab")) + " trabajadores</b>, salario medio " + fmt(V("salMedio")) + " CUP. ⚡ Energía: " + esc(($("energiaSel") && $("energiaSel").selectedOptions && $("energiaSel").selectedOptions[0]) ? $("energiaSel").selectedOptions[0].text : T("energiaSel")) + ".</p>";
+    if (D && D.plantilla && D.plantilla.length) h += "<p><b>Plantilla:</b> " + D.plantilla.map(function (x) { return esc(x.puesto || x.nombre || "") + " ×" + (x.cantidad || 1); }).join(" · ") + "</p>";
+    if (D && D.equipos && D.equipos.length) h += "<p><b>Equipamiento:</b> " + D.equipos.length + " partidas (" + D.equipos.slice(0, 6).map(function (x) { return esc(x.nombre || x.desc || ""); }).join(", ") + (D.equipos.length > 6 ? "…" : "") + ").</p>";
+    h += "<h4>Bloque legal y cronograma</h4>";
+    if (TR) {
+      h += "<p><b>" + esc(TR.veredicto || "") + "</b> · Cronograma total estimado: " + fmt(TR.totalMeses || 0) + " meses.</p>";
+      if (TR.bloqueos && TR.bloqueos.length) h += "<p>⛔ Bloquean la presentación: " + TR.bloqueos.map(esc).join(" · ") + "</p>";
+      if (TR.condicionantes && TR.condicionantes.length) h += "<p>🟡 Condicionan: " + TR.condicionantes.map(esc).join(" · ") + "</p>";
+    } else h += "<p class='hint'>Revisa el checklist de licencias en su tarjeta («Trámites»): aquí verás si algo bloquea la presentación.</p>";
+    return h;
+  }
+
+  function panelFinanzas() {
+    const r = R(); if (!r) return SIN;
+    const B = window._bancaria || null, ES = window._escenarios || null;
+    const invT = V("invLocal") + V("invEquipos") + V("invCapital");
+    const fin = V("fAutCUP") + V("fCredito") + V("fPresTerr");
+    let h = "<h4 style='margin:4px 0'>El dinero, sin vueltas</h4>";
+    h += "<div class='tblwrap'><table class='t'><tr><th>Inversión</th><th>CUP</th></tr>"
+      + "<tr><td>Local y obra</td><td class='mono'>" + fmt(V("invLocal")) + "</td></tr>"
+      + "<tr><td>Equipamiento</td><td class='mono'>" + fmt(V("invEquipos")) + "</td></tr>"
+      + "<tr><td>Capital de trabajo</td><td class='mono'>" + fmt(V("invCapital")) + "</td></tr>"
+      + "<tr><td><b>Total</b></td><td class='mono'><b>" + fmt(invT) + "</b></td></tr></table></div>";
+    h += "<p>Financiamiento declarado: <b>" + fmt(fin) + " CUP</b>" + (invT > fin ? " → <b style='color:#b33939'>te faltan " + fmt(invT - fin) + " CUP por cubrir</b> (eso es la brecha: hay que cerrarla o bajar la inversión)." : " → cubre la inversión ✔") + "</p>";
+    h += "<p>Ficha rápida: vendes a <b>" + fmt(V("precio")) + "</b>, te cuesta <b>" + fmt(V("cvu")) + "</b> por unidad, margen neto <b>" + fmt1(r.margen) + " %</b> y el punto de equilibrio son <b>" + fmt(r.peUnd) + " und/mes</b> (por debajo de eso, pierdes).</p>";
+    if (r.e5 && r.e5.filas6) h += "<div class='tblwrap'><table class='t'><tr><th>Año</th><th>Ingresos</th><th>Flujo neto</th></tr>" + r.e5.filas6.map(function (f) { return "<tr><td>" + f.y + "</td><td class='mono'>" + fmt(f.ing) + "</td><td class='mono'>" + fmt(f.net) + "</td></tr>"; }).join("") + "</table></div>";
+    if (B) h += "<p>🏦 Banco: cuota <b>" + fmt(B.cuota) + " CUP/mes</b> · DSCR mínimo <b>" + (B.dscrMin == null ? "—" : fmt1(B.dscrMin)) + "</b> (lo que generas ÷ lo que pagas de deuda; bajo 1, el banco se preocupa) · Beneficio/Costo <b>" + (B.bc == null ? "—" : fmt1(B.bc)) + "</b> · Depreciación " + fmt(B.depAnual) + " CUP/año.</p>";
+    if (ES) h += "<p>🎲 Si las cosas se tuercen (escenario pesimista): VAN " + fmt(ES.pesimista.van) + " CUP. Si van bien (optimista): VAN " + fmt(ES.optimista.van) + " CUP. El detalle está en la tarjeta de Metodología.</p>";
+    return h;
+  }
+
+  const AUDIT = [
+    { g: "Mercado", items: [["descProy", "Describe qué vendes (producto o servicio)"], ["precio", "Precio de venta"], ["capacidad", "Capacidad mensual"], ["ocupacion", "Ocupación esperada (%)"]] },
+    { g: "Técnicos", items: [["invEquipos", "Inversión en equipamiento"], ["numTrab", "Número de trabajadores"], ["salMedio", "Salario medio del proyecto"]] },
+    { g: "Económicos", items: [["cvu", "Costo variable por unidad"]], extra: function () { const t = V("invLocal") + V("invEquipos") + V("invCapital"); return t > 0 ? null : { etiqueta: "La inversión total (local, equipos o capital de trabajo)", campo: "invLocal" }; } },
+    { g: "Financiamiento", items: [], extra: function () { const t = V("fAutCUP") + V("fAutDiv") + V("fCredito") + V("fPresTerr"); return t > 0 ? null : { etiqueta: "Al menos una fuente de financiamiento (propio, crédito o presupuesto)", campo: "fAutCUP" }; } },
+    { g: "Legales y de plan", items: [["eEncad", "Encadenamiento con productores locales"], ["eAporte", "Beneficio del proyecto a la población"]], extra: function () { return window._planMun ? null : { etiqueta: "El Plan de desarrollo de tu municipio (súbelo o búscalo desde la app)", campo: "eLineam" }; } }
+  ];
+  function faltantes() {
+    const out = [];
+    AUDIT.forEach(function (grupo) {
+      const miss = [];
+      (grupo.items || []).forEach(function (par) { const id = par[0]; const e = $(id); const vacio = !e || (e.tagName === "SELECT" ? false : (String(e.value || "").trim() === "" || Number(e.value) === 0)); if (vacio) miss.push({ etiqueta: par[1], campo: id }); });
+      if (grupo.extra) { const x = grupo.extra(); if (x) miss.push(x); }
+      out.push({ g: grupo.g, miss: miss });
+    });
+    return out;
+  }
+  window.fcFaltantes = faltantes;
+
+  function panelAccion() {
+    const F = faltantes();
+    const total = F.reduce(function (a, x) { return a + x.miss.length; }, 0);
+    let h = "<h4 style='margin:4px 0'>Datos obligatorios que faltan (" + total + ")</h4>";
+    if (!total) h += "<p>✅ Tu estudio tiene todos los datos obligatorios de la auditoría. Lo demás es pulirlo.</p>";
+    F.forEach(function (grupo) {
+      if (!grupo.miss.length) { h += "<p>✔ <b>" + grupo.g + ":</b> completo.</p>"; return; }
+      h += "<p style='margin-bottom:2px'>✘ <b>" + grupo.g + "</b></p>" + grupo.miss.map(function (m) { return "<div class='pt-falta'><span>" + esc(m.etiqueta) + "</span><button type='button' class='btn btn-d' data-campo='" + m.campo + "'>Ir al campo →</button></div>"; }).join("");
+    });
+    const C = window._correccion || null;
+    h += "<h4>Ruta a factible y mejoras</h4>";
+    if (C) h += "<p>La ruta a factible ya encontró escenarios correctivos para este estudio: revísalos y aplícalos en su tarjeta («Ruta a factible»); las cifras de esta vista se actualizan solas.</p>";
+    else h += "<p class='hint'>Si el dictamen no es factible, la tarjeta «Ruta a factible» busca qué cambiar (precio, costos, ocupación, escala) y las mejoras del catálogo lo refuerzan.</p>";
+    const TR = window._tramites || null;
+    if (TR && TR.bloqueos && TR.bloqueos.length) h += "<p>⛔ Antes de presentar: resuelve los bloqueos legales de la pestaña «Operaciones».</p>";
+    h += "<h4>Próximos pasos</h4><ol style='margin:4px 0;padding-left:20px'><li>Completa los datos faltantes de arriba.</li><li>Guarda el estudio en tu base (queda en tu hoja).</li><li>Descarga el documento oficial y/o redacta la propuesta para presentarlo.</li></ol>";
+    h += "<p><button type='button' class='btn btn-p' id='ptRedactar'>📝 Redactar la propuesta completa</button></p>";
+    return h;
+  }
+
+  const TABS = [["resumen", "📋 Resumen y viabilidad", panelResumen], ["mercado", "📈 Mercado y demanda", panelMercado], ["operaciones", "⚙️ Operaciones y técnica", panelOperaciones], ["finanzas", "💰 Finanzas", panelFinanzas], ["accion", "🧭 Plan de acción", panelAccion]];
+  let activa = "resumen";
+  function render() {
+    TABS.forEach(function (t) { const p = $("pt-" + t[0]); if (p) p.innerHTML = t[2](); });
+    document.querySelectorAll(".pt-b").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === activa); });
+    document.querySelectorAll(".pt-panel").forEach(function (pn) { pn.classList.toggle("on", pn.id === "pt-" + activa); });
+    const rb = $("ptRedactar"); if (rb) rb.addEventListener("click", function () { const b = $("fcPropBtn"); if (b) { b.scrollIntoView({ behavior: "smooth", block: "center" }); b.click(); } });
+    document.querySelectorAll("[data-campo]").forEach(function (b) { b.addEventListener("click", function () { const e = $(b.dataset.campo); if (e) { e.scrollIntoView({ behavior: "smooth", block: "center" }); try { e.focus(); } catch (err) {} e.style.outline = "3px solid #d99a16"; setTimeout(function () { e.style.outline = ""; }, 2200); } }); });
+  }
+  window.fcPestanasRender = render;
+  function montar() {
+    if ($("estudioCard")) return;
+    const ref = $("metodoCard") || $("consolaCard");
+    const card = document.createElement("section"); card.className = "card"; card.id = "estudioCard";
+    card.innerHTML = "<h3 style='margin-top:0'>📑 Tu estudio, en orden</h3><p class='hint'>La lectura clara de tu factibilidad: cada dato una sola vez y en su pestaña, explicado sin tecnicismos. Se llena sola al generar el informe; el documento oficial sigue siendo la salida para imprimir y presentar.</p>"
+      + "<div class='pt-bar'>" + TABS.map(function (t) { return "<button type='button' class='pt-b' data-tab='" + t[0] + "'>" + t[1] + "</button>"; }).join("") + "</div>"
+      + TABS.map(function (t) { return "<div class='pt-panel' id='pt-" + t[0] + "'></div>"; }).join("");
+    if (ref && ref.parentNode) ref.parentNode.insertBefore(card, ref); else document.body.appendChild(card);
+    card.querySelectorAll(".pt-b").forEach(function (b) { b.addEventListener("click", function () { activa = b.dataset.tab; render(); }); });
+    render();
+  }
+  if (typeof window.generarInforme === "function") { const og = window.generarInforme; window.generarInforme = function () { const r = og.apply(this, arguments); setTimeout(render, 1100); return r; }; }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(montar, 4200); });
+  else setTimeout(montar, 4200);
+  setTimeout(montar, 10000);
+})();
+</script>
+
