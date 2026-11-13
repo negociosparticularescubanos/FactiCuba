@@ -3319,3 +3319,100 @@ else if(typeof navigator!=="undefined"&&navigator.onLine){ sincronizarTasas(fals
 else { const st=$("syncStatus"); if(st) st.textContent="⚠️ Sin conexión: valores de referencia. Reconecte para datos en vivo."; }
 $("muniSel").onchange=function(){window._terrManual=true;renderFicha();}; $("provSel").onchange=function(){window._terrManual=true;cargarMun();};
 </script>
+
+<script>
+/* ===== MODO REAL (sobre la app de GitHub): TODO al mercado informal =====
+   Orden de Leonardo (2026-11-13): todos los cálculos y los informes al
+   mercado informal (cálculos reales). El escenario «oficial» deja de
+   mover cualquier cifra: tasaModo/nucleoCompleto «of» calculan igual
+   que «inf»; el combustible usa siempre el precio informal; la tasa
+   activa es siempre la informal de elToque. Desglose por partidas:
+   inversión (local · equipos · materia prima, materiales y capital de
+   trabajo) y mes (materia prima y materiales · salarios · aportes ·
+   combustible · otros fijos · impuestos). */
+(function(){
+"use strict";
+function $(i){ return document.getElementById(i); }
+function V(i){ var e=$(i); var n=e?parseFloat(e.value):0; return isFinite(n)?n:0; }
+function F(n){ try{ return fmt(n); }catch(e){ return String(Math.round(n||0)); } }
+window._modoReal = true;
+
+/* 1 · La tasa que usa el motor es SIEMPRE la informal */
+if (typeof tasaActiva === "function") {
+  var _ta = tasaActiva;
+  tasaActiva = function(cod){ var inf = V("inf"+cod); return inf > 0 ? inf : _ta(cod); };
+}
+if (typeof tasaModo === "function") {
+  var _tm = tasaModo;
+  tasaModo = function(cod, modo){ if (modo === "of") return V("inf"+cod) || _tm(cod, "inf"); return _tm(cod, modo); };
+}
+/* 2 · El combustible se paga SIEMPRE al precio informal */
+if (typeof combustibleTotal === "function") {
+  var _ct = combustibleTotal;
+  combustibleTotal = function(modo){ return _ct("inf"); };
+}
+/* 3 · El escenario «oficial» calcula igual que el informal */
+if (typeof costoFijoTotal === "function") {
+  var _cf = costoFijoTotal;
+  costoFijoTotal = function(modo){ return _cf(modo === "of" ? "inf" : modo); };
+}
+if (typeof nucleoCompleto === "function") {
+  var _nc = nucleoCompleto;
+  nucleoCompleto = function(modo){ return _nc(modo === "of" ? "inf" : modo); };
+}
+/* 4 · El escenario de precio queda fijo en informal */
+if (typeof setEscPrecio === "function") { var _se = setEscPrecio; setEscPrecio = function(m){ return _se("informal"); }; }
+if (typeof toggleEscPrecio === "function") { toggleEscPrecio = function(){ var e=$("escPrecio"); if (e) e.value = "informal"; }; }
+
+/* Candados visuales: fuentes de combustible y escenario, fijos en informal */
+function candados(){
+  try{ if (typeof forzarTasaInformal === "function") forzarTasaInformal(); }catch(e){}
+  ["fuGas","fuDie","fuBal","fuKwh"].forEach(function(id){ var el=$(id); if (el){ el.value = "informal"; el.disabled = true; el.title = "Modo real: el combustible se paga al precio informal (el de la calle)"; } });
+  var ep = $("escPrecio"); if (ep) ep.value = "informal";
+  var ss = $("syncStatus");
+  if (ss && !$("modoRealBadge")) { var b = document.createElement("span"); b.id = "modoRealBadge"; b.textContent = " · 🔴 MODO REAL: todo se calcula al mercado informal"; b.style.cssText = "color:#b91c1c;font-weight:700"; ss.parentNode && ss.parentNode.appendChild(b); }
+}
+
+/* 5 · Desglose real dentro del informe (sección 3, la financiera) */
+function desgloseHTML(){
+  var R = (typeof ultimoResultado !== "undefined") ? ultimoResultado : null;
+  if (!R) return "";
+  var sL = V("invLocal"), sE = V("invEquipos"), sC = V("invCapital"), sT = sL + sE + sC;
+  var tot = R.invTotalCUP || R.inv || sT, f = sT > 0 ? tot / sT : 1;
+  var otros = (R.CF || 0) - (R.nomina || 0) - (R.tribNom || 0) - (R.cuotaSocios || 0) - (R.combTot || 0);
+  var tasa = 0; try{ tasa = tasaActiva("USD"); }catch(e){}
+  function fila(n, v){ return "<tr><td>" + n + "</td><td class='mono'>" + F(v) + "</td></tr>"; }
+  return "<div id='mrDesglose'><h4 style='margin:14px 0 6px'>🔴 Desglose real — todo al mercado informal</h4>"
+    + "<p class='hint'>Base de cálculo: <b>mercado informal</b> (precios y tasa reales de la calle" + (tasa ? "; USD informal hoy ≈ " + F(tasa) + " CUP" : "") + "). Sin tasas oficiales: así son los números que vas a vivir.</p>"
+    + "<div class='tblwrap'><table class='t'><tr><th>Inversión inicial, por partidas</th><th>CUP</th></tr>"
+    + fila("Habilitación del local", sL * f)
+    + fila("Equipos y tecnología", sE * f)
+    + fila("Materia prima, materiales y capital de trabajo", sC * f)
+    + fila("<b>Total inversión</b>", tot) + "</table></div>"
+    + "<div class='tblwrap'><table class='t'><tr><th>El mes, por partidas</th><th>CUP/mes</th></tr>"
+    + fila("Materia prima y materiales", R.cvTot || 0)
+    + fila("Salarios (nómina + cuota de socios)", (R.nomina || 0) + (R.cuotaSocios || 0))
+    + fila("Aportes (seguridad social + impuesto por el uso de la fuerza de trabajo)", R.tribNom || 0)
+    + fila("Combustible (precio informal)", R.combTot || 0)
+    + fila("Otros costos fijos", Math.max(0, otros))
+    + fila("Impuestos (ventas + utilidades)", (R.impVentasMes || 0) + (R.impUtilMes || 0))
+    + "</table></div></div>";
+}
+function insertarDesglose(){
+  var box = $("informeBox"); if (!box) return;
+  var viejo = $("mrDesglose"); if (viejo) viejo.remove();
+  var html = desgloseHTML(); if (!html) return;
+  var cards = box.querySelectorAll(".card"), destino = null;
+  for (var i = 0; i < cards.length; i++) { var h = cards[i].querySelector("h3"); if (h && h.textContent.indexOf("Da dinero") >= 0) { destino = cards[i]; break; } }
+  var tmp = document.createElement("div"); tmp.innerHTML = html;
+  var nodo = tmp.firstChild;
+  if (destino) destino.appendChild(nodo); else box.appendChild(nodo);
+}
+if (typeof generarInforme === "function") {
+  var _gi = generarInforme;
+  generarInforme = function(skip){ candados(); var r = _gi(skip); insertarDesglose(); setTimeout(insertarDesglose, 300); return r; };
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", candados); else candados();
+setTimeout(candados, 1500);
+})();
+</script>
