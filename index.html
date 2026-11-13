@@ -433,7 +433,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <div class="row">
           <div><label class="f" for="braveKey">Clave Brave Search (opcional, gratis en brave.com/search/api; solo este navegador)</label><input type="password" id="braveKey" autocomplete="off" placeholder="BSA-..."></div>
           <div><label class="f" for="tavilyKey">Clave Tavily (opcional, gratis en tavily.com; solo este navegador)</label><input type="password" id="tavilyKey" autocomplete="off" placeholder="tvly-..."></div>
-          <div><label class="f" for="geminiKey">Clave Gemini — IA de apoyo (opcional, gratis en aistudio.google.com; solo este navegador)</label><input type="password" id="geminiKey" autocomplete="off" placeholder="Pega aquí tu clave de Gemini"></div>
+          <div><label class="f" for="pollinationsKey">Clave Pollinations — IA de apoyo (opcional, gratis en pollinations.ai; solo este navegador)</label><input type="password" id="pollinationsKey" autocomplete="off" placeholder="Pega aquí tu clave de Pollinations"></div>
         </div>
         <div class="row">
           <div><label class="f" for="webUrl">Traer texto de una URL concreta (ONEI, BCC, elToque, prensa…)</label><input type="text" id="webUrl" placeholder="Pegue https://… y pulse «Traer URL»"></div>
@@ -2992,7 +2992,7 @@ async function fcRespaldoInternet() {
     } catch (e) {}
     if (!puesto) {
       try {
-        const g = await fcGeminiRespaldo(b);
+        const g = await fcPolliRespaldo(b);
         if (g) { const el2 = document.getElementById(b.id); if (el2 && !(parseFloat(el2.value) > 0)) { el2.value = g.v; filas.push({ c: b.nombre, v: fmt(g.v), ev: g.ev }); puesto = true; } }
       } catch (e) {}
     }
@@ -3634,69 +3634,66 @@ function fcExtraPlan(txt) {
 </script>
 
 <script>
-/* ===== GEMINI — IA DE APOYO EN LA BÚSQUEDA DE DATOS (2026-11-12) =====
-   La clave la pone el dueño en el campo «Clave Gemini» del panel web y
-   vive SOLO en su navegador (localStorage, como Brave/Tavily). La app
-   pública NO trae ninguna clave escrita. Uso: cuando el buscador no
-   encuentra un dato del respaldo (salario, alquiler, precio informal),
-   se le pregunta a Gemini — primero con búsqueda web de Google; si eso
-   falla, con su conocimiento — y solo se rellena si responde un número
-   claro dentro de rango, marcado «IA Gemini — VERIFICAR». Si no, el
-   campo queda en blanco, como manda la regla. */
+/* ===== POLLINATIONS — IA DE APOYO EN LA BÚSQUEDA DE DATOS (2026-11-12) =====
+   Sustituye a Gemini por orden del dueño. La clave la pone él en el campo
+   «Clave Pollinations» del panel web y vive SOLO en su navegador
+   (localStorage, como Brave/Tavily). La app pública NO trae clave alguna.
+   Uso: cuando el buscador no encuentra un dato del respaldo (salario,
+   alquiler, precio informal), se le pregunta a Pollinations (endpoint
+   OpenAI-compatible verificado) y solo se rellena si responde un número
+   claro dentro de rango, marcado «IA Pollinations — VERIFICAR». Si
+   responde SIN DATO o falla, el campo queda en blanco. Al cargar, se
+   borra de este navegador cualquier clave de Gemini guardada antes. */
 (function () {
   const _save = window.webKeysSave;
   if (typeof _save === "function") {
     window.webKeysSave = function (o) {
       const prev = (typeof webKeys === "function") ? webKeys() : {};
-      ["brave", "tavily", "gemini"].forEach(function (k) { if (o[k] === undefined && prev[k]) o[k] = prev[k]; });
+      ["brave", "tavily", "pollinations"].forEach(function (k) { if (o[k] === undefined && prev[k]) o[k] = prev[k]; });
       return _save(o);
     };
+    try { const wk = webKeys() || {}; if ("gemini" in wk) { delete wk.gemini; _save(wk); } } catch (e) {}
   }
   function cargar() {
-    const el = document.getElementById("geminiKey"); if (!el) return;
-    try { const g = (webKeys() || {}).gemini; if (g && !el.value) el.value = g; } catch (e) {}
+    const el = document.getElementById("pollinationsKey"); if (!el) return;
+    try { const g = (webKeys() || {}).pollinations; if (g && !el.value) el.value = g; } catch (e) {}
     if (!el.dataset.on) {
       el.dataset.on = "1";
       el.addEventListener("change", function () {
-        try { const wk = webKeys() || {}; wk.gemini = el.value.trim(); webKeysSave(wk); } catch (e) {}
+        try { const wk = webKeys() || {}; wk.pollinations = el.value.trim(); webKeysSave(wk); } catch (e) {}
       });
     }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargar); else cargar();
 })();
-function fcGeminiClave() {
-  const el = document.getElementById("geminiKey");
+function fcPolliClave() {
+  const el = document.getElementById("pollinationsKey");
   const v = el && el.value ? el.value.trim() : "";
   if (v) return v;
-  try { return ((webKeys() || {}).gemini || "").trim(); } catch (e) { return ""; }
+  try { return ((webKeys() || {}).pollinations || "").trim(); } catch (e) { return ""; }
 }
-async function fcGeminiPregunta(pregunta, conBusqueda) {
-  const key = fcGeminiClave(); if (!key) return null;
-  const body = { contents: [{ parts: [{ text: pregunta }] }] };
-  if (conBusqueda) body.tools = [{ google_search: {} }];
-  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error("Gemini HTTP " + r.status);
-  const j = await r.json();
-  const cand = (j.candidates || [])[0] || {};
-  const txt = ((cand.content || {}).parts || []).map(function (x) { return x.text || ""; }).join(" ");
-  return { txt: txt, conFuentes: !!(cand.groundingMetadata && (cand.groundingMetadata.groundingChunks || []).length) };
-}
-async function fcGeminiRespaldo(b) {
-  if (!fcGeminiClave()) return null;
+async function fcPolliRespaldo(b) {
+  const key = fcPolliClave(); if (!key) return null;
   const pregunta = b.q + ". Responde SOLO en este formato: NUMERO | FUENTE (el número en CUP, sin texto adicional). Si no hay un dato claro y confiable, responde exactamente: SIN DATO.";
-  let r = null;
-  try { r = await fcGeminiPregunta(pregunta, true); } catch (e) { r = null; }
-  if (!r) { try { r = await fcGeminiPregunta(pregunta, false); } catch (e) { return null; } }
-  if (!r || /SIN DATO/i.test(r.txt)) return null;
-  const m = r.txt.match(/(\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)/);
-  if (!m) return null;
-  const v = pn(m[1]);
-  if (!isFinite(v) || v < b.min || v > b.max) return null;
-  const fuente = (r.txt.split("|")[1] || "sin fuente citada").trim().slice(0, 60);
-  return { v: Math.round(v), ev: "IA Gemini " + (r.conFuentes ? "con búsqueda web" : "(conocimiento del modelo)") + " · " + fuente + " — VERIFICAR" };
+  const ctrl = new AbortController(); const to = setTimeout(function () { ctrl.abort(); }, 45000);
+  try {
+    const r = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: pregunta }] }),
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const txt = (((j.choices || [])[0] || {}).message || {}).content || "";
+    if (!txt || /SIN DATO/i.test(txt)) return null;
+    const m = txt.match(/(\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)/);
+    if (!m) return null;
+    const v = pn(m[1]);
+    if (!isFinite(v) || v < b.min || v > b.max) return null;
+    const fuente = (txt.split("|")[1] || "sin fuente citada").trim().slice(0, 60);
+    return { v: Math.round(v), ev: "IA Pollinations · " + fuente + " — VERIFICAR" };
+  } catch (e) { clearTimeout(to); return null; }
 }
 </script>
