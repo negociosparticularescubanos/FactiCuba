@@ -85,3 +85,35 @@ base (verde = servidor alcanzado, rojo = sin conexión, ping real al
 /exec y cada 60 s). Los estudios se guardan también en la base
 (Estudios + Entradas_JSON por partes) y la copia local queda de caché.
 La credencial que traía el paquete quedó RETIRADA del código.
+
+## Financiamiento con préstamo (2026-11-13)
+- Sin estudios de precios: eliminados el bloque formal-vs-informal, el comparador
+  de escenarios de precio, la búsqueda de precios (Revolico + web) y sus secciones
+  en el informe técnico y el documento cliente.
+- Paso 2, «Financiamiento: préstamo necesario y otorgado»: recursos propios (CUP),
+  préstamo necesario auto = inversión inicial total en CUP − propios (mín. 0),
+  y préstamo otorgado por el banco (editable). Aviso en vivo: cubierto / faltante.
+- La confianza de datos usa la cobertura del préstamo en vez del rango de precios.
+- Informe técnico (💰) y documento cliente incluyen la tabla del préstamo.
+
+## Palanca formal/informal (2026-11-13)
+- Paso 2: interruptor Formal/Informal + precios de referencia. La palanca fija
+  el precio de venta del estudio (editable a mano después). El informe y el
+  documento cliente declaran el escenario usado.
+
+## Correcciones 2026-11-13 (territorio, formato, origen)
+- detectarTerritorio por puntos: "Playa Girón" ya no se confunde con el municipio
+  Playa (gana mención explícita de municipio, nombre compuesto y provincia citada).
+- Si el usuario ya eligió provincia/municipio, el documento no lo sobrescribe.
+- Informe técnico con formato de documento formal (portada, secciones, firmas),
+  igual que el informe cliente.
+- Trazabilidad: el informe declara origen (documento / estimación automática /
+  manual) y la ficha municipal lleva etiqueta de estimación automática.
+
+## Informe ONEI (2026-11-13)
+- Paso 2, como el Plan municipal: zona para subir el informe/anuario ONEI
+  (PDF/TXT/DOCX). Extrae población, visitantes (anual→mensual), ocupados,
+  salario medio y producción (con miles/millones).
+- Solo se aplica si el informe es del municipio seleccionado; si no, avisa.
+- Alimenta la demanda estimada, el informe técnico (sección ONEI), el cliente
+  (fila ONEI en supuestos) y se guarda en guardados/enlace.
