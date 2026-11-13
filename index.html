@@ -1137,9 +1137,10 @@ async function extraerDocx(file){
     const stream=new Blob([comp]).stream().pipeThrough(ds);
     xml=td.decode(await new Response(stream).arrayBuffer());
   } else throw new Error("Método ZIP no soportado: "+docMethod);
-  const parts=[...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m=>m[1]);
-  const paras=xml.split(/<w:p[ >]/g).length-1;
-  return parts.join(" ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">") + (paras?"":"");
+  let tx=xml.replace(/<\/w:tc>/g," | ").replace(/<\/w:tr>/g,"\n").replace(/<\/w:p>/g,"\n");
+  tx=tx.replace(/<[^>]+>/g,"");
+  tx=tx.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,"\"").replace(/&#(\d+);/g,function(mm,nn){ return String.fromCharCode(+nn); });
+  return tx.replace(/[ \t]+/g," ").replace(/ *\n */g,"\n").replace(/\n{3,}/g,"\n\n").trim();
 }
 async function extraerPdf(file){
   const buf=await file.arrayBuffer();
@@ -3788,6 +3789,191 @@ try {
       const box = document.getElementById("docOficial");
       if (box) { box.innerHTML = h; box.style.display = "block"; }
       return h;
+    };
+  }
+})();
+</script>
+
+<script>
+/* ===== LECTURA PROFESIONAL DE DOCUMENTOS (fcDocPro) =====
+   Corrige la lectura automática tras probarla con una propuesta real:
+   - Guardia anti-falsos-positivos: fuera números que son secciones,
+     decretos, años o topes legales («Impuesto sobre Utilidades… sección
+     10» NO es un 10 %; «hasta 100 contratados» NO es la plantilla).
+   - Territorio por frecuencia real de menciones (no el primer nombre
+     que aparezca: «Playa Girón» no es el municipio Playa).
+   - Sector ponderado con el encabezado del documento; actor PDL si el
+     documento ES un proyecto de desarrollo local ante el CAM.
+   - Nombre entre «comillas» limpio; objetivo, encadenamiento e impacto
+     extraídos por SECCIONES, no por frases sueltas.
+   - La tabla de puestos del documento rellena la plantilla por
+     categorías de la tarjeta de Detalle; renovables y mitigación de
+     residuos alimentan las tarjetas Integral y de Trámites. */
+(function () {
+  const norm = function (x) { return (typeof normSinTilde === "function") ? normSinTilde(x) : String(x || "").toLowerCase(); };
+  const PORC = { impVentas: 1, impUtil: 1, impFuerza: 1, impSegSoc: 1, cuotaInformal: 1, depImp: 1, eSust: 1 };
+  const CHICOS = { impVentas: 1, impUtil: 1, impFuerza: 1, impSegSoc: 1, cuotaInformal: 1, depImp: 1, eSust: 1, numSocios: 1, numTrab: 1, frecInput: 1, crecAnual: 1, inflAnual: 1 };
+  function guardias(t, hh) {
+    for (const id of Object.keys(hh.vals)) {
+      const sp = (typeof CAMPO_SPEC !== "undefined") ? CAMPO_SPEC.find(function (x) { return x.id === id; }) : null;
+      if (!sp) continue;
+      let malo = false, motivo = "";
+      for (const lb of sp.labels) {
+        let m = null;
+        try { m = t.match(new RegExp(lb + "[^\\d%]{0,60}?" + "([\\d]+(?:[.,]\\d+)?)", "i")); } catch (e) {}
+        if (!m) continue;
+        const frag = m[0], idx = t.indexOf(frag), tras = t.slice(idx + frag.length, idx + frag.length + 5);
+        if (/secci|cap[ií]tul|anexo|decreto|gaceta|art[ií]culo/i.test(frag)) { malo = true; motivo = "es una referencia (sección/decreto), no un dato"; }
+        if (CHICOS[id] && hh.vals[id] >= 1900 && hh.vals[id] <= 2099) { malo = true; motivo = "es un año, no un dato"; }
+        if (/\/20\d\d/.test(tras)) { malo = true; motivo = "es un número de norma (ej. 174/2026)"; }
+        const numStr = m[m.length - 1];
+        const posNum = idx + frag.lastIndexOf(numStr);
+        if (posNum > 0 && t.charAt(posNum - 1) === "\n" && /^\s*[.)]/.test(tras)) { malo = true; motivo = "es el número de un epígrafe o lista"; }
+        if (PORC[id] && !/%|por ciento/.test(tras)) { malo = true; motivo = "porcentaje sin símbolo % en el documento"; }
+        break;
+      }
+      if (malo) { delete hh.vals[id]; delete hh.evs[id]; }
+    }
+  }
+  function territorioPro(t) {
+    const n = " " + norm(t).replace(/\n/g, " ") + " ";
+    let mejor = null;
+    for (const p of Object.keys(PROV_MUN)) {
+      for (const m of PROV_MUN[p]) {
+        const nm = norm(m); let c = 0, i = 0;
+        const claves = [" " + nm + " ", " " + nm + ",", " " + nm + ".", " " + nm + "|", "municipio " + nm, "de " + nm + ","];
+        for (const k of claves) { i = 0; while ((i = n.indexOf(k, i)) >= 0) { c++; i += k.length; } }
+        if (m === "Playa") { let j = 0; while ((j = n.indexOf("playa giron", j)) >= 0) { c -= 2; j += 5; } j = 0; while ((j = n.indexOf("playa larga", j)) >= 0) { c -= 2; j += 5; } }
+        if (c >= 2 && (!mejor || c > mejor.c)) mejor = { p: p, m: m, c: c };
+      }
+    }
+    return mejor;
+  }
+  function sectorPro(t) {
+    const n = norm(t), cab = n.slice(0, 320);
+    let mejor = null;
+    for (const k of Object.keys(SECTOR_KWX)) {
+      let sc = 0;
+      for (const w of SECTOR_KWX[k]) { let i = 0; while ((i = n.indexOf(w, i)) >= 0) { sc++; i += w.length; } }
+      if (SECTOR_KWX[k].some(function (w) { return cab.indexOf(w) >= 0; })) sc = Math.round(sc * 1.6) + 2;
+      if (sc >= 3 && (!mejor || sc > mejor.sc)) mejor = { sector: k, hits: sc, ev: "conteo ponderado del documento" };
+    }
+    return mejor;
+  }
+  function seccion(t, re, max) {
+    const lineas = t.split("\n");
+    for (let i = 0; i < lineas.length; i++) {
+      if (re.test(lineas[i]) && lineas[i].length < 90) {
+        const partes = [];
+        for (let j = i + 1; j < lineas.length && partes.join(" ").length < max; j++) {
+          const L = lineas[j].trim();
+          if (!L) { if (partes.length) break; else continue; }
+          if (/^\d+\.\s+\S/.test(L) || (/^[A-ZÁÉÍÓÚÑ]/.test(L) && L.length < 70 && !/[.:,;]$/.test(L) && j > i + 1)) break;
+          partes.push(L.replace(/\s*\|\s*/g, "; "));
+        }
+        const out = partes.join(" ").replace(/\s+/g, " ").trim();
+        if (out.length >= 40) return out.slice(0, max);
+      }
+    }
+    return null;
+  }
+  if (typeof analizarDocFull === "function") {
+    const an0 = analizarDocFull;
+    analizarDocFull = function (t) {
+      const hh = an0.apply(this, arguments);
+      try {
+        window._docTexto = t;
+        guardias(t, hh);
+        const rg = t.match(/entre\s+(\d+)\s+y\s+(\d+)\s+(empleos|trabajadores|puestos)/i);
+        if (rg) { const med = Math.round((+rg[1] + +rg[2]) / 2); hh.vals.eEmpleos = med; hh.evs.eEmpleos = "«entre " + rg[1] + " y " + rg[2] + " empleos» → punto medio " + med; window._docEmpleosRango = med; }
+        const ter = territorioPro(t);
+        if (ter && (!hh.territorio || hh.territorio.m !== ter.m)) hh.territorio = { p: ter.p, m: ter.m };
+        const sec = sectorPro(t);
+        if (sec && (!hh.sector || sec.hits > (hh.sector.hits || 0))) hh.sector = sec;
+        const nl = norm(t);
+        const dl = (nl.match(/desarrollo local/g) || []).length;
+        if (dl >= 3 && /consejo de la administracion|\bcam\b/.test(nl)) hh.actor = "pdl";
+        const nm = t.match(/nombre[^«"]{0,60}«([^»]{3,60})»/i) || t.match(/«([^»]{3,60})»/);
+        if (nm) hh.nomProy = nm[1].trim();
+        const obj = seccion(t, /objetivo general/i, 600); if (obj) hh.eObj = obj;
+        const enc = seccion(t, /l[ií]nea 3|encadenamiento productivo/i, 400); if (enc) hh.eEnc = enc;
+        const apo = seccion(t, /impacto esperado/i, 420); if (apo) hh.eApo = apo;
+        const res = seccion(t, /resumen ejecutivo/i, 1400); if (res) hh.desc = res;
+      } catch (e) {}
+      return hh;
+    };
+  }
+  function plantillaDeTabla(t) {
+    const cats = { dir: 0, tec: 0, ope: 0, adm: 0, ser: 0 };
+    const reglas = [[/responsable|director|gerente|administrador del proyecto/, "dir"], [/formador|t[eé]cnico|especialista|instructor/, "tec"], [/cocinero|ayudante de cocina|elaborador|operario|producci[oó]n|panadero|dulcero/, "ope"], [/almac[eé]n|administrativ|contador|comprador|encargado de compras/, "adm"], [/dependiente|repartidor|mensajero|limpieza|venta|chofer|vigilancia/, "ser"]];
+    const catDe = function (nombre) {
+      if (nombre.length < 3 || nombre.length > 60 || /cantidad|puesto|funci[oó]n/.test(nombre)) return null;
+      for (const r of reglas) { if (r[0].test(nombre)) return r[1]; }
+      return null;
+    };
+    const cantDe = function (txt) {
+      const mm = String(txt || "").trim().match(/^(\d+)\s*(?:[–—-]\s*(\d+))?$/);
+      if (!mm) return 0;
+      const q = mm[2] ? Math.ceil((+mm[1] + +mm[2]) / 2) : +mm[1];
+      return (q >= 1 && q <= 100) ? q : 0;
+    };
+    let filas = 0;
+    const lineas = t.split("\n").map(function (x) { return x.replace(/^\s*\|\s*/, "").replace(/\s*\|\s*$/, "").trim(); });
+    for (let i = 0; i < lineas.length; i++) {
+      if (lineas[i].indexOf("|") >= 0) {
+        const celdas = lineas[i].split("|").map(function (x) { return x.trim(); });
+        if (celdas.length >= 2) {
+          const cat = catDe(norm(celdas[0]));
+          const q = cat ? cantDe(celdas[1]) : 0;
+          if (cat && q) { cats[cat] += q; filas++; }
+        }
+        continue;
+      }
+      const cat = catDe(norm(lineas[i]));
+      if (!cat) continue;
+      for (let j = i + 1; j <= Math.min(i + 2, lineas.length - 1); j++) {
+        if (!lineas[j]) continue;
+        const q = cantDe(lineas[j]);
+        if (q) { cats[cat] += q; filas++; }
+        break;
+      }
+    }
+    const total = cats.dir + cats.tec + cats.ope + cats.adm + cats.ser;
+    return (filas >= 4 && total >= 3 && total <= 200) ? { cats: cats, total: total, filas: filas } : null;
+  }
+  if (typeof aplicarDocFull === "function") {
+    const ap0 = aplicarDocFull;
+    aplicarDocFull = function (hh) {
+      const n = ap0.apply(this, arguments);
+      try {
+        const t = window._docTexto || "";
+        if (t) {
+          const pl = plantillaDeTabla(t);
+          if (pl) {
+            let det = {}; try { det = JSON.parse(localStorage.getItem("facticuba_detalle_v1") || "{}"); } catch (e) {}
+            det.plantilla = { dir: pl.cats.dir, tec: pl.cats.tec, ope: pl.cats.ope, adm: pl.cats.adm, ser: pl.cats.ser };
+            det.plantillaTotal = pl.total;
+            if (!det.fecha) det.fecha = new Date().toISOString();
+            try { localStorage.setItem("facticuba_detalle_v1", JSON.stringify(det)); } catch (e) {}
+            window._detalle = det;
+            if (typeof fcDetalleRender === "function") fcDetalleRender();
+            const nt = document.getElementById("numTrab");
+            if (nt && !(hh.vals && hh.vals.numTrab)) nt.value = pl.total;
+            const hb = document.getElementById("hallBox");
+            if (hb) hb.innerHTML += "<div class='alert info' style='margin-top:8px'>👥 <b>Plantilla detectada en la tabla de puestos del documento:</b> " + pl.total + " personas (dirección " + pl.cats.dir + " · técnicos " + pl.cats.tec + " · operarios " + pl.cats.ope + " · administración " + pl.cats.adm + " · servicios " + pl.cats.ser + "). Quedó puesta en la tarjeta «Detalle del expediente» y en el personal del formulario.</div>";
+          }
+          if (/paneles solares|fuentes renovables|energ[ií]a renovable/i.test(t)) {
+            try {
+              const st = JSON.parse(localStorage.getItem("facticuba_integral_v1") || "{}");
+              if (!st.renov || st.renov === "no") { st.renov = "parcial"; localStorage.setItem("facticuba_integral_v1", JSON.stringify(st)); if (typeof fcIntegralRender === "function") fcIntegralRender(); }
+            } catch (e) {}
+          }
+          const mit = t.match(/[^\n]{0,60}residuos[^\n]{20,220}/i);
+          const tm = document.getElementById("tramMitiga");
+          if (mit && tm && !tm.value) { tm.value = mit[0].replace(/\s*\|\s*/g, "; ").trim().slice(0, 240); if (typeof fcTramites === "function") fcTramites(); }
+        }
+      } catch (e) {}
+      return n;
     };
   }
 })();
