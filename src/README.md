@@ -117,3 +117,38 @@ La credencial que traía el paquete quedó RETIRADA del código.
 - Solo se aplica si el informe es del municipio seleccionado; si no, avisa.
 - Alimenta la demanda estimada, el informe técnico (sección ONEI), el cliente
   (fila ONEI en supuestos) y se guarda en guardados/enlace.
+
+## Plan de mejora (2026-11-14)
+- Paso 3, tarjeta «🛠️ Plan para hacerlo factible y mejorar lo flojo».
+- Diagnostica aspectos con puntaje bajo (mercado, operativa, financiera,
+  riesgos, confianza, equilibrio, préstamo, plan municipal, ONEI).
+- Si el dictamen no es 🟢, calcula con el motor real la ruta mínima a verde
+  (precio hasta el referente de calle, cvu, fijos, ocupación, capacidad,
+  inversión por fases, plantilla) + alternativa; si es 🟢, propone
+  optimización para subir margen y corregir lo flojo.
+- Plan de acción 90 días (0–30 / 30–60 / 60–90) con responsable, costo e
+  indicador; botón «Aplicar este escenario» lleva los valores al formulario.
+- Viaja con el informe técnico, el documento cliente (sección 9), guardados,
+  nube, compartido y enlace local.
+
+## Presentación para funcionarios (2026-11-14)
+- Paso 3, botón «Presentación funcionarios»: documento de 7 láminas para
+  defender el proyecto ante quienes lo aprueban (CAM/banco).
+- Portada con dictamen, KPIs y código; 1) lo que gana la comunidad (empleos,
+  masa salarial, aporte fiscal, sustitución de importaciones, oferta local);
+  2) factibilidad con números (equilibrio, utilidad, VAN/TIR/PRI, 3 años);
+  3) alineación país/municipio/ONEI; 4) operativa que no se para;
+  5) riesgos bajo control + plan de mejora; 6) qué se solicita y compromisos
+  con firmas; todo con datos del estudio y tono profesional.
+
+## Territorio por defecto (2026-11-14)
+- Arranque siempre en Matanzas → Ciénaga de Zapata (paso 1 y cada vez que se
+  elige Matanzas). El usuario puede cambiarlo; el documento solo lo
+  sobrescribe si aún no se tocó el territorio.
+
+## Mercado informal como base única (2026-11-14)
+- Todo el motor calcula con tasas informales (elToque): USD/EUR/MLC usan la
+  columna informal; el ajuste por brecha formal quedó desactivado (factor 1).
+- Selectores de uso bloqueados en «informal»; la columna formal BCC queda
+  solo como referencia y se eliminó la comparación oficial-vs-informal del
+  informe. Informes, cliente y presentación declaran tasa informal.
