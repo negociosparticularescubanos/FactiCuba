@@ -328,20 +328,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <div class="tblwrap"><table class="t" id="divisasTbl">
           <tr><th>Divisa</th><th>Formal BCC Seg. III 📡</th><th>Informal elToque 📡</th><th>Usar en cálculo</th><th>Manual → CUP</th></tr>
           <tr><td><b>USD → CUP</b></td>
-            <td><input type="number" id="ofiUSD" value="807" min="1" step="1"></td>
-            <td><input type="number" id="infUSD" value="410" min="1" step="1"></td>
+            <td><input type="number" id="ofiUSD" min="1" step="1" placeholder="Se sincroniza solo"></td>
+            <td><input type="number" id="infUSD" min="1" step="1" placeholder="Se sincroniza solo"></td>
             <td><select id="usoUSD"><option value="informal" selected>Informal</option><option value="oficial">Oficial</option><option value="manual">Manual</option></select></td>
-            <td><input type="number" id="manUSD" value="410" min="1" step="1"></td></tr>
+            <td><input type="number" id="manUSD" min="1" step="1" placeholder="Manual o sincronizada"></td></tr>
           <tr><td><b>EUR → CUP</b></td>
-            <td><input type="number" id="ofiEUR" value="904" min="1" step="1"></td>
-            <td><input type="number" id="infEUR" value="440" min="1" step="1"></td>
+            <td><input type="number" id="ofiEUR" min="1" step="1" placeholder="Se sincroniza solo"></td>
+            <td><input type="number" id="infEUR" min="1" step="1" placeholder="Se sincroniza solo"></td>
             <td><select id="usoEUR"><option value="informal" selected>Informal</option><option value="oficial">Oficial</option><option value="manual">Manual</option></select></td>
-            <td><input type="number" id="manEUR" value="440" min="1" step="1"></td></tr>
+            <td><input type="number" id="manEUR" min="1" step="1" placeholder="Manual o sincronizada"></td></tr>
           <tr><td><b>MLC → CUP</b></td>
-            <td><input type="number" id="ofiMLC" value="120" min="1" step="1"></td>
-            <td><input type="number" id="infMLC" value="210" min="1" step="1"></td>
+            <td><input type="number" id="ofiMLC" min="1" step="1" placeholder="Se sincroniza solo"></td>
+            <td><input type="number" id="infMLC" min="1" step="1" placeholder="Se sincroniza solo"></td>
             <td><select id="usoMLC"><option value="informal" selected>Informal</option><option value="oficial">Oficial</option><option value="manual">Manual</option></select></td>
-            <td><input type="number" id="manMLC" value="210" min="1" step="1"></td></tr>
+            <td><input type="number" id="manMLC" min="1" step="1" placeholder="Manual o sincronizada"></td></tr>
         </table></div>
         <div class="hint">Base de cálculo: CUP. <b>Formal</b> = tasaEspecial del <b>Segmento III del BCC</b> (api.bc.gob.cu; Segmentos I ≈ 24 y II ≈ 120 solo referencia contable estatal). <b>Informal</b> = mediana de elToque (mercado de la calle, reposición real, recomendada para costos en divisas). Elija por divisa qué tasa usa el motor. <span id="tasaResumen" class="mono"></span></div>
         <div class="hint" id="bccExtra">Otras divisas BCC (Seg. III): sincronice para verlas.</div>
@@ -411,7 +411,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
 
         <h3>Opción B — Formulario guiado del negocio</h3>
         <div class="row">
-          <div><label class="f" for="nomProy">Nombre del proyecto</label><input type="text" id="nomProy" value="Mi negocio"></div>
+          <div><label class="f" for="nomProy">Nombre del proyecto</label><input type="text" id="nomProy" placeholder="Nombre de su proyecto"></div>
           <div><label class="f" for="sectorSel">Sector</label>
             <select id="sectorSel">
               <option>Gastronomía / cafetería</option><option>Comercio minorista</option><option>Manufactura ligera</option>
@@ -423,11 +423,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <label class="f" for="descProy">Descripción / objetivos (edítelo o viene del documento)</label>
         <textarea id="descProy" placeholder="Qué vende, a quién, dónde, propuesta de valor..."></textarea>
        <div class="btnrow no-print">
-         <button class="btn btn-d" onclick="conCarga(this,redactarIA)"><svg class="ic"><use href="#i-spark"/></svg> Redactar con IA</button>
-         <span class="hint" id="iaStatus">La IA redacta en vivo con sus datos; los números los calcula el motor.</span>
        </div>
-        <h3>🔎 Investigación web real + IA con fuentes (todo verificado)</h3>
-        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio) y luego la IA redacta <b>apoyándose solo en esas fuentes</b>, citándolas. Nada se inventa: cada dato web muestra su enlace y fecha de consulta. Funciona sin claves con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue.</div>
+        <h3>🔎 Investigación web real (fuentes verificables)</h3>
+        <div class="alert info">Busca <b>información real y actualizada</b> según su proyecto (sector + municipio + precio) y cada fuente queda citada con su enlace y su fecha de consulta.<b>apoyándose solo en esas fuentes</b>, citándolas. Nada se inventa: cada dato web muestra su enlace y fecha de consulta. Funciona sin claves con el espejo (web + Wikipedia + DuckDuckGo) y la URL que usted pegue.</div>
         <label class="f" for="webQuery">Consulta de búsqueda (se genera sola, edítela si quiere)</label>
         <input type="text" id="webQuery" placeholder="Ej: cafetería Santa Clara Cuba precios 2026">
         <div class="row">
@@ -438,7 +436,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         </div>
         <div class="btnrow no-print">
           <button class="btn btn-p" onclick="conCarga(this,buscarWebReal)"><svg class="ic"><use href="#i-search"/></svg> Buscar información real del proyecto</button>
-          <button class="btn btn-g" onclick="conCarga(this,redactarConFuentes)"><svg class="ic"><use href="#i-spark"/></svg> Redactar con fuentes (IA)</button>
           <button class="btn btn-d" onclick="limpiarWeb()">Limpiar</button>
           <span class="hint" id="webStatus">Pulse «Buscar» para traer información real en vivo de la web.</span>
         </div>
@@ -446,9 +443,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
 
         <h3>Inversión inicial estimada</h3>
         <div class="row3">
-          <div><label class="f" for="invLocal">Habilitación del local</label><input type="number" id="invLocal" value="250000" min="0" step="1000"></div>
-          <div><label class="f" for="invEquipos">Equipos y tecnología</label><input type="number" id="invEquipos" value="400000" min="0" step="1000"></div>
-          <div><label class="f" for="invCapital">Capital de trabajo inicial</label><input type="number" id="invCapital" value="150000" min="0" step="1000"></div>
+          <div><label class="f" for="invLocal">Habilitación del local</label><input type="number" id="invLocal" min="0" step="1000" placeholder="Ej.: 250 000"></div>
+          <div><label class="f" for="invEquipos">Equipos y tecnología</label><input type="number" id="invEquipos" min="0" step="1000" placeholder="Ej.: 400 000"></div>
+          <div><label class="f" for="invCapital">Capital de trabajo inicial</label><input type="number" id="invCapital" min="0" step="1000" placeholder="Ej.: 150 000"></div>
         </div>
         <div class="row">
           <div><label class="f" for="monInversion">Moneda en que tiene la inversión</label>
@@ -458,28 +455,28 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
 
         <h3>Operación mensual</h3>
         <div class="row4">
-          <div><label class="f" for="fijoAlquiler">Alquiler / local (CUP)</label><input type="number" id="fijoAlquiler" value="25000" min="0" step="500"></div>
-          <div><label class="f" for="fijoEnergia">Energía + combustible (CUP)</label><input type="number" id="fijoEnergia" value="18000" min="0" step="500"></div>
-          <div><label class="f" for="fijoConect">Conectividad ETECSA + pagos (CUP)</label><input type="number" id="fijoConect" value="5000" min="0" step="100"></div>
-          <div><label class="f" for="fijoOtros">Otros fijos (CUP)</label><input type="number" id="fijoOtros" value="10000" min="0" step="500"></div>
+          <div><label class="f" for="fijoAlquiler">Alquiler / local (CUP)</label><input type="number" id="fijoAlquiler" min="0" step="500" placeholder="Ej.: 25 000"></div>
+          <div><label class="f" for="fijoEnergia">Energía + combustible (CUP)</label><input type="number" id="fijoEnergia" min="0" step="500" placeholder="Ej.: 18 000"></div>
+          <div><label class="f" for="fijoConect">Conectividad ETECSA + pagos (CUP)</label><input type="number" id="fijoConect" min="0" step="100" placeholder="Ej.: 5 000"></div>
+          <div><label class="f" for="fijoOtros">Otros fijos (CUP)</label><input type="number" id="fijoOtros" min="0" step="500" placeholder="Ej.: 10 000"></div>
         </div>
         <div class="row3">
           <div><label class="f" for="fijoDivisa">Costos fijos en divisa (monto)</label><input type="number" id="fijoDivisa" value="0" min="0" step="10"></div>
-          <div><label class="f" for="cvu">Costo variable unitario (CUP)</label><input type="number" id="cvu" value="150" min="0" step="1"></div>
-          <div><label class="f" for="precio">Precio de venta unitario (CUP)</label><input type="number" id="precio" value="450" min="0" step="1"></div>
+          <div><label class="f" for="cvu">Costo variable unitario (CUP)</label><input type="number" id="cvu" min="0" step="1" placeholder="Ej.: 150"></div>
+          <div><label class="f" for="precio">Precio de venta unitario (CUP)</label><input type="number" id="precio" min="0" step="1" placeholder="Ej.: 450"></div>
         </div>
         <div class="row3">
-          <div><label class="f" for="capacidad">Capacidad mensual (unidades/servicios)</label><input type="number" id="capacidad" value="1200" min="1" step="10"></div>
-          <div><label class="f" for="ocupacion">Ocupación / demanda esperada (%)</label><input type="number" id="ocupacion" value="60" min="5" max="100" step="1"></div>
+          <div><label class="f" for="capacidad">Capacidad mensual (unidades/servicios)</label><input type="number" id="capacidad" min="1" step="10" placeholder="Ej.: 1 200"></div>
+          <div><label class="f" for="ocupacion">Ocupación / demanda esperada (%)</label><input type="number" id="ocupacion" min="5" max="100" step="1" placeholder="Ej.: 60"></div>
           <div><label class="f" for="competencia">Saturación competencia local</label>
             <select id="competencia"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option><option value="saturado">Saturada</option></select></div>
         </div>
 
         <h3>Precio del producto: formal vs. informal</h3>
         <div class="row3">
-          <div><label class="f" for="refFormal">Precio estatal / formal de referencia (CUP)</label><input type="number" id="refFormal" value="300" min="0" step="1"></div>
-          <div><label class="f" for="refInformal">Precio informal de la calle (CUP)</label><input type="number" id="refInformal" value="500" min="0" step="1"></div>
-          <div><label class="f" for="cuotaInformal">% de ventas a precio informal</label><input type="number" id="cuotaInformal" value="100" min="0" max="100" step="1"></div>
+          <div><label class="f" for="refFormal">Precio estatal / formal de referencia (CUP)</label><input type="number" id="refFormal" min="0" step="1" placeholder="Ej.: 300"></div>
+          <div><label class="f" for="refInformal">Precio informal de la calle (CUP)</label><input type="number" id="refInformal" min="0" step="1" placeholder="Ej.: 500"></div>
+          <div><label class="f" for="cuotaInformal">% de ventas a precio informal</label><input type="number" id="cuotaInformal" min="0" max="100" step="1" placeholder="Ej.: 30"></div>
         </div>
         <div class="hint">Su <b>precio de venta</b> (arriba) es el que usa el informe. Aquí compárelo: precio formal = lo que cobra el sector estatal; informal = lo que cobra la calle/competencia. La cuota % mezcla ambos escenarios en el comparador. <span id="posPrecio"></span></div>
         <div class="tblwrap"><table class="t" id="compPrecioTbl">
@@ -501,11 +498,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <div class="row3">
           <div><label class="f" for="escTur">Escenario turístico (visitantes)</label>
             <select id="escTur"><option value="1">Actual (dato ONEI/estimado)</option><option value="2.5">Recuperación parcial (×2,5)</option><option value="5">Temporada alta (×5)</option></select></div>
-          <div><label class="f" for="frecInput">Compras por cliente al mes</label><input type="number" id="frecInput" value="2" min="1" step="1"></div>
-          <div><label class="f" for="ingMed">Ingreso medio local (CUP/mes)</label><input type="number" id="ingMed" value="8000" min="0" step="500"></div>
+          <div><label class="f" for="frecInput">Compras por cliente al mes</label><input type="number" id="frecInput" min="1" step="1" placeholder="Ej.: 2"></div>
+          <div><label class="f" for="ingMed">Ingreso medio local (CUP/mes)</label><input type="number" id="ingMed" min="0" step="500" placeholder="Ej.: 8 000"></div>
         </div>
         <div class="row3">
-          <div><label class="f" for="depImp">Dependencia de insumos importados (%)</label><input type="number" id="depImp" value="40" min="0" max="100" step="1"></div>
+          <div><label class="f" for="depImp">Dependencia de insumos importados (%)</label><input type="number" id="depImp" min="0" max="100" step="1" placeholder="Ej.: 40"></div>
           <div><label class="f" for="shrInput">% insumos comprados en informal</label><input type="number" id="shrInput" value="0" min="0" max="100" step="1"></div>
           <div><label class="f" for="mkInput">Sobreprecio informal vs mayorista (%)</label><input type="number" id="mkInput" value="0" min="0" step="1"></div>
         </div>
@@ -516,17 +513,17 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <h3>Combustible mensual: estatal vs. informal</h3>
         <div class="tblwrap"><table class="t" id="combTbl">
           <tr><th>Combustible</th><th>Cantidad / mes</th><th>Precio estatal (CUP)</th><th>Precio informal (CUP)</th><th>Fuente</th><th>Subtotal</th></tr>
-          <tr><td>Gasolina (L)</td><td><input type="number" id="qGas" value="0" min="0" step="1"></td><td><input type="number" id="peGas" value="35" min="0" step="1"></td><td><input type="number" id="piGas" value="450" min="0" step="5"></td><td><select id="fuGas"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stGas">0</td></tr>
-          <tr><td>Diésel (L)</td><td><input type="number" id="qDie" value="0" min="0" step="1"></td><td><input type="number" id="peDie" value="30" min="0" step="1"></td><td><input type="number" id="piDie" value="400" min="0" step="5"></td><td><select id="fuDie"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stDie">0</td></tr>
-          <tr><td>Gas licuado (balita)</td><td><input type="number" id="qBal" value="0" min="0" step="1"></td><td><input type="number" id="peBal" value="180" min="0" step="5"></td><td><input type="number" id="piBal" value="2500" min="0" step="50"></td><td><select id="fuBal"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stBal">0</td></tr>
-          <tr><td>Electricidad planta (kWh generados)</td><td><input type="number" id="qKwh" value="0" min="0" step="10"></td><td><input type="number" id="peKwh" value="2" min="0" step="0.5"></td><td><input type="number" id="piKwh" value="60" min="0" step="1"></td><td><select id="fuKwh"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stKwh">0</td></tr>
+          <tr><td>Gasolina (L)</td><td><input type="number" id="qGas" value="0" min="0" step="1"></td><td><input type="number" id="peGas" min="0" step="1" placeholder="Se sincroniza solo"></td><td><input type="number" id="piGas" min="0" step="5" placeholder="Se sincroniza solo"></td><td><select id="fuGas"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stGas">0</td></tr>
+          <tr><td>Diésel (L)</td><td><input type="number" id="qDie" value="0" min="0" step="1"></td><td><input type="number" id="peDie" min="0" step="1" placeholder="Se sincroniza solo"></td><td><input type="number" id="piDie" min="0" step="5" placeholder="Se sincroniza solo"></td><td><select id="fuDie"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stDie">0</td></tr>
+          <tr><td>Gas licuado (balita)</td><td><input type="number" id="qBal" value="0" min="0" step="1"></td><td><input type="number" id="peBal" min="0" step="5" placeholder="Se sincroniza solo"></td><td><input type="number" id="piBal" min="0" step="50" placeholder="Se sincroniza solo"></td><td><select id="fuBal"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stBal">0</td></tr>
+          <tr><td>Electricidad planta (kWh generados)</td><td><input type="number" id="qKwh" value="0" min="0" step="10"></td><td><input type="number" id="peKwh" min="0" step="0.5" placeholder="Se sincroniza solo"></td><td><input type="number" id="piKwh" min="0" step="1" placeholder="Se sincroniza solo"></td><td><select id="fuKwh"><option value="estatal">Estatal</option><option value="informal" selected>Informal</option></select></td><td class="mono" id="stKwh">0</td></tr>
           <tr><td colspan="5" style="text-align:right"><b>Total combustible (se suma a los fijos)</b></td><td class="mono" id="stCombTot"><b>0</b></td></tr>
         </table></div>
         <div class="hint">Si consigue combustible estatal (CUPET, asignaciones), marque <b>Estatal</b>; si lo compra en la calle o para la planta, <b>Informal</b>. El total se suma automáticamente a los costos fijos del informe.</div>
         <div class="row3">
-          <div><label class="f" for="numTrab">Personal contratado (cantidad)</label><input type="number" id="numTrab" value="4" min="0" step="1"></div>
-          <div><label class="f" for="salMedio">Salario medio mensual c/u (CUP)</label><input type="number" id="salMedio" value="9000" min="0" step="100"></div>
-          <div><label class="f" for="numSocios">Socios / titulares (seg. social especial)</label><input type="number" id="numSocios" value="2" min="0" step="1"></div>
+          <div><label class="f" for="numTrab">Personal contratado (cantidad)</label><input type="number" id="numTrab" min="0" step="1" placeholder="Ej.: 8"></div>
+          <div><label class="f" for="salMedio">Salario medio mensual c/u (CUP)</label><input type="number" id="salMedio" min="0" step="100" placeholder="Ej.: 9 000"></div>
+          <div><label class="f" for="numSocios">Socios / titulares (seg. social especial)</label><input type="number" id="numSocios" min="0" step="1" placeholder="Ej.: 2"></div>
         </div>
 
         <h3>Obligaciones tributarias ONAT (% editables)</h3>
@@ -609,12 +606,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <label class="f" for="eObj">Objetivo general + objetivos específicos del proyecto</label>
         <textarea id="eObj" placeholder="Ej: Montar una cafetería con 20 empleos... Objetivos: 1) ... 2) ... 3) ..."></textarea>
         <div class="row">
-          <div><label class="f" for="eLineam">Alineación con Lineamientos 2021-2026 y Plan 2025-2026 (editable)</label><textarea id="eLineam" rows="3">Contribuye a los Lineamientos de la Política Económica y Social (actualización 2021-2026) y al Plan de la Economía 2025-2026: sustitución de importaciones, encadenamientos productivos, desarrollo territorial y avance hacia la corrección de distorsiones y reimpulso económico. Verifique el objeto social con la Dirección Municipal de Economía y Planificación.</textarea></div>
+          <div><label class="f" for="eLineam">Alineación con Lineamientos 2021-2026 y Plan 2025-2026 (editable)</label><textarea id="eLineam" rows="3" placeholder="Se completa solo al cargar el plan municipal, o escriba aquí la alineación de su proyecto…"></textarea></div>
           <div><label class="f" for="eAporte">Aporte territorial y encadenamientos</label><textarea id="eAporte" rows="3" placeholder="Ej: compra a productores del municipio, 2 proveedores locales, aporte al desarrollo local pactado con el CAM..."></textarea></div>
         </div>
         <div class="row3">
-          <div><label class="f" for="eEmpleos">Empleos totales a crear</label><input type="number" id="eEmpleos" value="6" min="0" step="1"></div>
-          <div><label class="f" for="eSust">Sustitución de importaciones estimada (%)</label><input type="number" id="eSust" value="20" min="0" max="100" step="1"></div>
+          <div><label class="f" for="eEmpleos">Empleos totales a crear</label><input type="number" id="eEmpleos" min="0" step="1" placeholder="Ej.: 10"></div>
+          <div><label class="f" for="eSust">Sustitución de importaciones estimada (%)</label><input type="number" id="eSust" min="0" max="100" step="1" placeholder="Ej.: 20"></div>
           <div><label class="f" for="eEncad">Encadenamientos (con quién se articula)</label><input type="text" id="eEncad" value="" placeholder="Ej: CCS local, MIPYME de pan, TCP transportista"></div>
         </div>
         <h3>Sección 2 · Marco de referencia y diagnóstico (metas 2025-2026 + ONEI)</h3>
@@ -627,7 +624,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         </div>
         <div class="alert info" id="turRef" style="margin-top:8px">Turismo real: pulse «Actualizar tasas en línea» para traer referencias verificadas.</div>
         <label class="f" for="eMetasPlan">Metas del Plan 2025-2026 adoptadas (editable)</label>
-        <textarea id="eMetasPlan" rows="3">Plan 2025-2026 (supuestos de trabajo editables): estabilización macroeconómica, corrección de distorsiones (precios, divisas, subsidios), impulso a la producción nacional de alimentos, recuperación del turismo, disciplina financiera y avance en la bancarización. Ajuste este texto con la versión vigente de su territorio.</textarea>
+        <textarea id="eMetasPlan" rows="3" placeholder="Se completa solo al cargar el plan municipal…"></textarea>
         <div class="row4">
           <div><label class="f" for="eRestDiv">Restricción monetaria/divisas</label><textarea id="eRestDiv" rows="2" placeholder="Ej: acceso limitado a divisas oficiales; reposición a tasa informal"></textarea></div>
           <div><label class="f" for="eRestEner">Restricción energética</label><textarea id="eRestEner" rows="2" placeholder="Ej: apagones 4-8 h; planta + solar"></textarea></div>
@@ -668,11 +665,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <h3>Sección 6 · Riesgos monetarios, logísticos y energéticos + mitigación</h3>
         <div class="tblwrap"><table class="t">
           <tr><th>Riesgo</th><th>Prob. 1-5</th><th>Impacto 1-5</th><th>Costo mitigación (CUP)</th><th>Acción / responsable</th></tr>
-          <tr><td><b>Monetario/cambiario</b><br><span class="hint">brecha, devaluación, reposición</span></td><td><select id="rP_1"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option></select></td><td><select id="rI_1"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option></select></td><td><input type="number" id="rC_1" value="0" min="0" step="500"></td><td><input type="text" id="rA_1" value="Ajuste mensual de precios; colchón 20% en divisas"></td></tr>
-          <tr><td><b>Logístico/importación</b><br><span class="hint">fletes, proveedores, aduana</span></td><td><select id="rP_2"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></td><td><select id="rI_2"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option></select></td><td><input type="number" id="rC_2" value="0" min="0" step="500"></td><td><input type="text" id="rA_2" value="2-3 proveedores; stock 30-60 días"></td></tr>
-          <tr><td><b>Energético/apagones</b><br><span class="hint">déficit, combustible planta</span></td><td><select id="rP_3"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option></select></td><td><select id="rI_3"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></td><td><input type="number" id="rC_3" value="0" min="0" step="500"></td><td><input type="text" id="rA_3" value="Kit solar + planta/UPS; horario diurno"></td></tr>
-          <tr><td><input type="text" id="rN_4" value="Regulatorio/ONAT" style="font-weight:700"></td><td><select id="rP_4"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></td><td><select id="rI_4"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_4" value="0" min="0" step="500"></td><td><input type="text" id="rA_4" value="Contador trimestral; objeto social exacto"></td></tr>
-          <tr><td><input type="text" id="rN_5" value="Competencia/pagos" style="font-weight:700"></td><td><select id="rP_5"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_5"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_5" value="0" min="0" step="500"></td><td><input type="text" id="rA_5" value="Diferenciación; 2 pasarelas + efectivo"></td></tr>
+          <tr><td><b>Monetario/cambiario</b><br><span class="hint">brecha, devaluación, reposición</span></td><td><select id="rP_1"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_1"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_1" value="0" min="0" step="500"></td><td><input type="text" id="rA_1" placeholder="Medida de mitigación…"></td></tr>
+          <tr><td><b>Logístico/importación</b><br><span class="hint">fletes, proveedores, aduana</span></td><td><select id="rP_2"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_2"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_2" value="0" min="0" step="500"></td><td><input type="text" id="rA_2" placeholder="Medida de mitigación…"></td></tr>
+          <tr><td><b>Energético/apagones</b><br><span class="hint">déficit, combustible planta</span></td><td><select id="rP_3"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_3"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_3" value="0" min="0" step="500"></td><td><input type="text" id="rA_3" placeholder="Medida de mitigación…"></td></tr>
+          <tr><td><input type="text" id="rN_4" style="font-weight:700" placeholder="Otro riesgo (nombre)"></td><td><select id="rP_4"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_4"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_4" value="0" min="0" step="500"></td><td><input type="text" id="rA_4" placeholder="Medida de mitigación…"></td></tr>
+          <tr><td><input type="text" id="rN_5" style="font-weight:700" placeholder="Otro riesgo (nombre)"></td><td><select id="rP_5"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><select id="rI_5"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></td><td><input type="number" id="rC_5" value="0" min="0" step="500"></td><td><input type="text" id="rA_5" placeholder="Medida de mitigación…"></td></tr>
         </table></div>
         <div class="btnrow">
           <button class="btn btn-g" onclick="conCarga(this,()=>generarInforme(false))"><svg class="ic"><use href="#i-chart"/></svg> Generar estudio completo</button>
@@ -1800,18 +1797,7 @@ async function diagnosticarConexion(){
   }
   pon(pasos.join(" · "));
 }
-async function redactarIA(){
-  const st=$("iaStatus");
-  let gt=null; try{ if(typeof root!=="undefined"&&root.generateText) gt=root.generateText; }catch(e){}
-  if(!gt){ if(st) st.textContent="IA no disponible (requiere conexión y el plugin de IA). Redacte a mano."; return; }
-  if(st) st.textContent="✨ Redactando con IA…";
-  try{
-    const txt=await gt("Redacta en español cubano, 4-6 líneas, la descripción comercial de un proyecto ("+$("sectorSel").value+") llamado '"+$("nomProy").value+"' en "+$("muniSel").value+", "+$("provSel").value+", Cuba. Precio "+$("precio").value+" CUP, capacidad "+$("capacidad").value+" unidades al mes, inversión "+(invInicialCUP())+" CUP. Tono técnico y vendedor, sin inventar cifras más allá de las dadas.");
-    $("descProy").value=String(txt).slice(0,1200);
-    if(st) st.textContent="✅ Borrador IA listo: revíselo y ajústelo antes de generar el informe.";
-  }catch(e){ if(st) st.textContent="⚠️ La IA no respondió: redacte a mano."; }
-}
-/* ---- Investigación web real + IA fundamentada (fuentes verificables) ---- */
+/* ---- Investigación web real (fuentes verificables) ---- */
 function escH(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function webQueryAuto(){
   const cur=($("webQuery")&&$("webQuery").value||"").trim();
@@ -1850,9 +1836,9 @@ function pintarWeb(){
   w.items.forEach(function(it,i){
     h+="<tr><td class='mono'>["+(i+1)+"]</td><td>"+escH(it.fuente)+"</td><td style='text-align:left'><b>"+escH(it.titulo||"(sin título)")+"</b><br><span style='color:#475569'>"+escH((it.extracto||"").slice(0,280))+"</span></td><td style='text-align:left'><a href='"+escH(it.url)+"' target='_blank' rel='noopener'>abrir ↗</a></td></tr>";
   });
-  h+="</table></div><p class='hint'>Fuentes guardadas con el estudio y añadidas al informe técnico y al documento cliente. La IA solo redacta con estos textos; no inventa cifras del mercado.</p>";
+  h+="</table></div><p class='hint'>Fuentes guardadas con el estudio y citadas en el informe técnico y en el documento. El motor no inventa cifras del mercado.</p>";
   box.innerHTML=h;
-  if(st&&st.dataset.spin) st.textContent="✅ Investigación lista: "+w.items.length+" fuentes ("+f+"). Ya puede «Redactar con fuentes» o generar el informe.";
+  if(st&&st.dataset.spin) st.textContent="✅ Investigación lista: "+w.items.length+" fuentes ("+f+"). Ya puede generar el informe: las fuentes quedan citadas en él.";
 }
 async function buscarWebReal(){
   const st=$("webStatus");
@@ -1914,48 +1900,6 @@ async function traerUrl(){
   }catch(e){ if(st) st.textContent="⚠️ No se pudo traer la URL: "+String(e.message||e).slice(0,120)+". Pruebe con «Pegar texto» en el paso 1 o con otra URL."; }
 }
 function limpiarWeb(){ window._web=null; try{ localStorage.removeItem("facticuba_research_v1"); }catch(e){} const b=$("webResults"); if(b) b.innerHTML=""; const st=$("webStatus"); if(st) st.textContent="Investigación borrada. El informe volverá a salir sin sección de fuentes web."; }
-async function redactarConFuentes(){
-  const st=$("webStatus"), ia=$("iaStatus");
-  let gt=null; try{ if(typeof root!=="undefined"&&root.generateText) gt=root.generateText; }catch(e){}
-  if(!gt){ if(st) st.textContent="IA no disponible (requiere conexión y el plugin de IA)."; return; }
-  const w=window._web;
-  if(!w||!w.items||!w.items.length){ if(st) st.textContent="⚠️ Primero pulse «Buscar información real» o «Traer URL»: la IA fundamentada exige fuentes reales."; return; }
-  if(st) st.textContent="🧠 Redactando con "+w.items.length+" fuentes reales… (la IA no inventa cifras)";
-  if(ia) ia.textContent="🧠 Redactando con fuentes reales…";
-  try{
-    const base="Usted es un analista de prefactibilidad de negocios en Cuba. Tono técnico caribeño, preciso y honesto.";
-    const srcs=w.items.slice(0,8).map(function(x,i){ return "["+(i+1)+"] "+x.fuente+" — "+(x.titulo||"")+"\n"+(x.extracto||"").slice(0,500)+"\nURL: "+x.url; }).join("\n\n");
-    const task="TAREA FINAL: redacte en español cubano, 6-10 líneas, la descripción comercial del proyecto '"+$("nomProy").value+"' ("+$("sectorSel").value+") en "+$("muniSel").value+", "+$("provSel").value+", Cuba. Precio "+$("precio").value+" CUP, capacidad "+$("capacidad").value+" uds/mes, inversión "+(invInicialCUP())+" CUP. REGLAS: use SOLO las cifras del proyecto para números; la información web sirve para contexto (demanda, competencia, turismo, logística) y debe citarse como [1], [2]…; si las fuentes no respaldan algo, no lo afirme; cierre con una frase de validación en la cuadra. Devuelva SOLO el texto.";
-    const prompt=base+"\n\n<FUENTES WEB REALES consultadas el "+w.fecha.slice(0,10)+", consulta «"+w.query+"»>\n"+srcs+"\n\n<PROYECTO>\nSector: "+$("sectorSel").value+"\nMunicipio: "+$("muniSel").value+", "+$("provSel").value+"\nPrecio: "+$("precio").value+" CUP\n</PROYECTO>\n\n"+task;
-    let full="";
-    const txt=await gt({instruction:prompt,onChunk:function(d){ full=d.fullTextSoFar||full; $("descProy").value=String(full).slice(0,2000); }});
-    $("descProy").value=String(txt).slice(0,2000);
-    if(st) st.textContent="✅ Descripción generada con "+Math.min(8,w.items.length)+" fuentes citadas. Revísela antes de generar el informe.";
-    if(ia) ia.textContent="✅ Borrador con fuentes listo en la descripción.";
-  }catch(e){ if(st) st.textContent="⚠️ La IA no respondió: "+String(e.message||e).slice(0,120); }
-}
-function b64e(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
-function b64d(s){ return decodeURIComponent(escape(atob(String(s).replace(/-/g,"+").replace(/_/g,"/")))); }
-function enlaceLocal(){
-  try{
-    if(!ultimoResultado) return null;
-    const payload={v:4,inputs:snapInputs(),plan:planCompacto(),fuentesWeb:ultimoResultado.fuentesWeb||null,preMercado:ultimoResultado.preMercado||null};
-    return location.href.split("#")[0]+"#e="+b64e(JSON.stringify(payload));
-  }catch(e){ return null; }
-}
-function restaurarEnlace(){
-  try{
-    const m=(location.hash||"").match(/#e=([A-Za-z0-9\-_]+)/);
-    if(!m) return false;
-    const j=JSON.parse(b64d(m[1]));
-    if(!j||!j.inputs) return false;
-    ponerInputs(j.inputs);
-    window._web=j.fuentesWeb||null; window._precios=j.preMercado||null; window._planMun=j.plan||null; try{ pintarPlan(); pintarPlanComp(); }catch(e){}
-    try{ pintarWeb(); pintarPrecios(); }catch(e){}
-    renderFicha(); generarInforme(); go("s3");
-    return true;
-  }catch(e){ return false; }
-}
 async function compartirEstudio(){
   const st=$("shareStatus");
   if(!ultimoResultado){ if(st) st.textContent="Primero genere el informe."; return; }
