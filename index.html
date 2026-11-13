@@ -4019,7 +4019,7 @@ try {
     tabla([["Adecuación del local / obra", nv("invLocal") > 0 ? F(nv("invLocal")) + " CUP" : dato("", "inversión en local")], ["Equipamiento", nv("invEquipos") > 0 ? F(nv("invEquipos")) + " CUP" : dato("", "inversión en equipos")], ["Capital de trabajo", nv("invCapital") > 0 ? F(nv("invCapital")) + " CUP" : dato("", "capital de trabajo")], ["TOTAL", "<b>" + (invTot > 0 ? F(invTot) + " CUP" : "—") + "</b>"]]);
     if (eqItems.length) H.push("<table><tr><th>Equipo / medio</th><th>Cant.</th><th>Precio (CUP)</th><th>Importe (CUP)</th></tr>" + eqItems.map(function (e) { return "<tr><td>" + esc(e.nombre) + "</td><td>" + (e.cant || 1) + "</td><td>" + F(e.precio || 0) + "</td><td>" + F((e.cant || 1) * (e.precio || 0)) + "</td></tr>"; }).join("") + "</table>");
     h2("8. Financiamiento");
-    pp(finTxt.length ? "La inversión se financia con " + finTxt.join(", ") + "." + (esPDL ? " Los créditos a través del Fondo de Fideicomiso para el Desarrollo Local devengan la comisión del 4 % establecida (Resolución 202/2026 del MFP y Resolución 118/2026 del BCC)." : "") : dato("", "fuentes de financiamiento y sus montos"));
+    pp(finTxt.length ? "La inversión se financia con " + finTxt.join(", ") + "." + (esPDL ? " Los créditos a través del Fondo de Fideicomiso para el Desarrollo Local devengan la comisión del " + (((window._fcConocimiento || {}).parametros || {}).fideicomiso_pct || 4) + " % establecida (Resolución 202/2026 del MFP y Resolución 118/2026 del BCC)." : "") : dato("", "fuentes de financiamiento y sus montos"));
     h2("9. Viabilidad económica" + (esPDL ? " (análisis de viabilidad del expediente)" : ""));
     pp(parr("Ficha de costo del producto/servicio principal: precio de venta " + F(nv("precio")) + " CUP, costo variable unitario " + F(nv("cvu")) + " CUP, margen de contribución " + F(nv("precio") - nv("cvu")) + " CUP por unidad.",
       R.peUnd ? "El punto de equilibrio se alcanza con " + F(R.peUnd) + " unidades al mes, frente a unas ventas previstas de " + F(R.und || 0) + " unidades." : "",
@@ -4075,5 +4075,50 @@ try {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarBoton); else montarBoton();
   setTimeout(montarBoton, 1500);
+})();
+</script>
+
+<script>
+/* ===== FACTICUBA APRENDE (fcAprende) =====
+   La página lee al abrir su base de conocimiento viva
+   (conocimiento.json, en el mismo sitio): la mantiene el agente de
+   estudio diario que revisa la Gaceta Oficial y los organismos
+   (MEP, MINCEX, BCC, MFP/ONAT, CITMA, ONEI). La página muestra lo
+   aprendido y APLICA sus parámetros en cálculos y documentos. Sin
+   conexión, usa la última copia guardada en el navegador. */
+(function () {
+  function render(c) {
+    if (!c || !c.entradas) return;
+    window._fcConocimiento = c;
+    let card = document.getElementById("aprendCard");
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "card"; card.id = "aprendCard";
+      let ancla = null;
+      document.querySelectorAll(".card h3").forEach(function (h) { if (/Plataforma de operación/.test(h.textContent)) ancla = h.closest(".card"); });
+      if (ancla && ancla.parentNode) ancla.parentNode.insertBefore(card, ancla.nextSibling);
+      else { const dc = document.getElementById("docCard"); if (dc && dc.parentNode) dc.parentNode.insertBefore(card, dc); else document.body.appendChild(card); }
+    }
+    const ult = c.entradas.slice(0, 5).map(function (e) {
+      return "<div style='border-top:1px solid var(--line,#d8dee9);padding:7px 2px'><b>" + String(e.titulo || "") + "</b> <span class='hint'>" + String(e.fecha || "") + " · " + String(e.tipo || "") + "</span><div style='font-size:13px'>" + String(e.resumen || "") + "</div><div class='hint'>Fuente: " + (e.fuenteUrl ? "<a href='" + e.fuenteUrl + "' target='_blank' rel='noopener'>" + String(e.fuente || "ver fuente") + "</a>" : String(e.fuente || "—")) + (e.aplica ? " · Se aplica en: " + String(e.aplica) : "") + "</div></div>";
+    }).join("");
+    card.innerHTML = "<h3>🧠 FactiCuba aprende cada día</h3>"
+      + "<div class='alert info'>Base de conocimiento <b>actualizada el " + String(c.actualizado || "—") + "</b> por el agente de estudio (revisa cada mañana la Gaceta Oficial, el MEP, el MINCEX, el BCC, el MFP/ONAT, el CITMA y la ONEI). Novedades incorporadas: <b>" + c.entradas.length + "</b>. Los parámetros de esta base (comisiones, topes, plazos y mínimos legales) se aplican solos en los cálculos y en los documentos que genera la app.</div>"
+      + ult
+      + "<div class='hint'>Si una norma cambia, el agente actualiza primero esta base y le avisa a Leonardo; los cambios de código de la app se proponen y se aplican con su aprobación, nunca en silencio.</div>";
+  }
+  function cargar() {
+    try {
+      const cache = localStorage.getItem("facticuba_conocimiento_v1");
+      if (cache) { try { render(JSON.parse(cache)); } catch (e) {} }
+    } catch (e) {}
+    if (typeof fetch === "function") {
+      fetch("conocimiento.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
+        if (c) { try { localStorage.setItem("facticuba_conocimiento_v1", JSON.stringify(c)); } catch (e) {} render(c); }
+      }).catch(function () {});
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargar); else cargar();
+  setTimeout(cargar, 2500);
 })();
 </script>
