@@ -295,6 +295,11 @@ body.ver-present .wrap,body.ver-present .topbar{display:none}
 .doc-bar i{display:block;width:70%;border-radius:4px 4px 0 0}
 .doc-bar span{font-size:10.5px;color:#334155;text-align:center}
 .doc-sign{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:34px}
+.fld-rojo{outline:2px solid #dc2626 !important;outline-offset:1px;background:#fef2f2 !important;border-radius:6px}
+.fld-amarillo{outline:2px solid #eab308 !important;outline-offset:2px;background:#fefce8 !important;border-radius:6px}
+.psimple{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin:12px 0;font-size:13.5px;line-height:1.6}
+.pimport{background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:12px 14px;margin:12px 0;font-size:13.5px;line-height:1.6}
+.marca-leyenda{font-size:12px;color:#475569}
 .doc-sign div{border-top:1px solid #111;padding-top:6px;font-size:12.5px}
 @media print{
   .topbar,.nav,.no-print{display:none !important}
@@ -700,7 +705,7 @@ body.ver-present .wrap,body.ver-present .topbar{display:none}
             <button class="btn btn-p" onclick="generarPlanMejoraBtn()">Generar plan de mejora</button>
             <button class="btn btn-d" onclick="limpiarPlanMejora()">Limpiar</button>
           </div>
-          <div id="planMejoraBox"><div class="hint">Genere el informe primero y pulse «Generar plan de mejora».</div></div>
+          <p class="hint marca-leyenda">🔴 debe cambiar para ser factible · 🟡 modificado por la ruta aplicada</p><div id="planMejoraBox"><div class="hint">Genere el informe primero y pulse «Generar plan de mejora».</div></div>
         </div>
       </div>
 
@@ -2572,6 +2577,7 @@ function generarInforme(skip){
   var planC=null; try{ planC=compararPlan(); }catch(e){ planC={origen:"ninguna",checks:[],nivel:"sin plan"}; }
   ultimoResultado={exp:E14,e5:E5h,plan:planCompacto(),onei:oneiCompacto(),planComp:planC,p,m,actor,tam,fT,tasa,divCod,divUso,combTot,prestNec:vNum("prestNecesario"),prestBanco:vNum("prestBanco"),recPropios:vNum("recPropios"),invTotalCUP:((typeof invInicialCUP==="function")?invInicialCUP():0),onei:oneiCompacto(),escPrecio:((document.getElementById("escPrecio")||{}).value||"informal"),refFormal:vNum("refFormal"),refInformal:vNum("refInformal"),inv,nomina,tribNom,cuotaSocios,CF,precio,cvu,cvuEff:cvuEff,EF:EF,impV,impU,cap,ocup,und,ingresos,cvTot,impVentasMes,utilBruta,impUtilMes,utilNeta,margen,peUnd,peCup,pri,priBase,filas,van,tir,sens,conf,confNivel,confDet,serie,rampaOn,crec:crec,infl:infl,demA,demScore,opScore,finScore,riesgo,dict,dictCls,motivos,conds,fecha:new Date().toISOString(),nombre:$("nomProy").value||"Sin nombre",sector:$("sectorSel").value,comp,en,NC:NC,fuentesWeb:(window._web&&window._web.items&&window._web.items.length?window._web:null),preMercado:(window._precios&&window._precios.items&&window._precios.items.length?window._precios:null)};
   renderInforme();
+  try{marcarRojosSegunDict();}catch(e){}
   if(!skip) go("s3");
 }
 
@@ -2612,7 +2618,7 @@ function renderInforme(){
   +"<div><span>Punto de equilibrio</span><b class='mono'>"+fmt(r.peUnd)+" uds ("+fmt(r.peCup)+" CUP)</b></div>"
   +"<div><span>PRI recuperación</span><b class='mono'>"+(isFinite(r.pri)?fmt1(r.pri)+" meses":"No se recupera")+"</b></div>"
   +"<div><span>Margen neto</span><b class='mono'>"+fmt1(r.margen)+"%</b></div></div>"
-  +"<p class='hint'>"+r.nombre+" · "+r.sector+" · "+r.p+" → "+r.m+" · "+ACTOR_INFO[r.actor].n+(r.actor.startsWith("mipyme")?" ("+$("tamanoSel").selectedOptions[0].text+")":"")+" · "+fecha+" · "+tasaTxt+" · Moneda costos: "+$("monCostos").value+" / ingresos: "+$("monIngresos").value+"</p>"+"<p class='hint'>Origen de los datos: "+origenTxt+"</p>"
+  +"<p class='hint'>"+r.nombre+" · "+r.sector+" · "+r.p+" → "+r.m+" · "+ACTOR_INFO[r.actor].n+(r.actor.startsWith("mipyme")?" ("+$("tamanoSel").selectedOptions[0].text+")":"")+" · "+fecha+" · "+tasaTxt+" · Moneda costos: "+$("monCostos").value+" / ingresos: "+$("monIngresos").value+"</p>"+"<p class='hint'>Origen de los datos: "+origenTxt+"</p>"+simpleSec(r)+importaSec(r)
   +"<div class='card' style='box-shadow:none'><h3>🟢 1 · ¿Hay clientes? — Demanda y poder adquisitivo ("+Math.round(r.demScore)+"/100) <span class='tag "+sem(r.demScore,70,45)+"'>"+(r.demScore>=70?"Sólida":r.demScore>=45?"Media":"Débil")+"</span></h3>"
   +"<p style='font-size:14px'>Mercado en <b>"+r.m+"</b> ("+r.fT.tipo+"). Ticket de <b>"+fmt(r.precio)+" CUP</b> = <b>"+fmt1(r.precio/SALARIO_MEDIO_REF*100)+"%</b> del salario medio de referencia ("+fmt(SALARIO_MEDIO_REF)+" CUP). Ocupación supuesta: "+fmt(r.und)+" de "+fmt(r.cap)+" uds ("+r.ocup+"%). Competencia local: <b>"+r.comp+"</b>.</p>"+"<p class='hint'>Escenario de precios del estudio: <b>"+(r.escPrecio==="formal"?"formal / estatal ("+fmt(r.refFormal)+" CUP)":"informal / calle ("+fmt(r.refInformal)+" CUP)")+"</b>. Mueva la palanca del paso 2 para estudiar el otro escenario.</p>"
   +"<ul class='list'><li>Demanda estimada automática: <b>~"+fmt(demA.total)+" ventas/mes</b> ("+fmt(demA.local)+" vecinos + "+fmt(demA.tur)+" visitantes) para "+$("sectorSel").value+" en "+r.m+" con competencia "+r.comp+".</li><li>Si el ticket supera el 8–10% del salario medio, la compra se vuelve ocasional: necesita formato económico o combos.</li><li>"+criterioLocal(r.p,r.m,r.fT)+"</li><li>Validación práctica: preventa o sondeo a 30–50 vecinos; si menos del 30% pagaría ese precio, ajuste antes de invertir.</li><li>Gasto mensual por cliente: <b>"+fmt(r.precio*Math.max(1,val("frecInput")))+" CUP</b> ("+fmt1(r.precio*Math.max(1,val("frecInput"))/Math.max(1,val("ingMed"))*100)+"% del ingreso medio local de "+fmt(val("ingMed"))+" CUP).</li></ul><div class='tblwrap'><table class='t'><tr><th>Escenario turístico</th><th>Visitantes/mes</th><th>Clientes/mes</th><th>Ventas/mes (CUP)</th></tr>"+drows+"</table></div><p class='hint'>Escenarios sobre la demanda estimada: el turismo actual es bajo (dato ONEI); la recuperación multiplicaría clientes y ventas si hay capacidad.</p></div>"
@@ -2653,7 +2659,7 @@ function renderInforme(){
   +"<tr><td>Competencia ("+r.comp+")</td><td><span class='tag "+(r.comp==="saturado"?"bad":r.comp==="alta"?"warn":"ok")+"'>"+r.comp+"</span></td><td style='text-align:left'>Diferenciación real (no solo precio): calidad constante, delivery, combos, fidelización.</td></tr>"
   +"<tr><td>Conectividad / pagos</td><td><span class='tag "+(r.fT.con<=2?"warn":"ok")+"'>"+(r.fT.con<=2?"Medio":"Bajo")+"</span></td><td style='text-align:left'>Doble vía (datos + voz), dos pasarelas activas, cartel con QR y confirming por SMS.</td></tr></table></div>"
   +"<div class='alert "+(r.dictCls==="ok"?"ok":r.dictCls==="warn"?"warn":"bad")+"'><b>Condiciones y próximos pasos:</b>"+conds+"</div>"
-  +finSec(r)+oneiSec(r)
+  +cambioSec(r)+finSec(r)+oneiSec(r)
   +webSec(r)
   +expSec(r)
   +planSec(r)
@@ -3091,14 +3097,14 @@ function generarPlanMejora(){
     try{ if(document.body.classList.contains("ver-tecnico")) renderInforme(); }catch(e){}
   }catch(err){ if(box) box.innerHTML="<div class='alert bad'>No se pudo generar el plan: "+escH(String(err&&err.message||err)).slice(0,200)+"</div>"; }
 }
-function limpiarPlanMejora(){ window._planMejora=null; const box=$("planMejoraBox"); if(box) box.innerHTML="<div class='hint'>Plan limpiado. Pulse «Generar plan de mejora» para recalcular.</div>"; try{ renderInforme(); }catch(e){} }
+function limpiarPlanMejora(){ window._planMejora=null; try{document.querySelectorAll(".fld-amarillo").forEach(function(el){ el.classList.remove("fld-amarillo"); });}catch(e){} const box=$("planMejoraBox"); if(box) box.innerHTML="<div class='hint'>Plan limpiado. Pulse «Generar plan de mejora» para recalcular.</div>"; try{ renderInforme(); }catch(e){} }
 function aplicarRutaPlan(i){
   const pm=window._planMejora; if(!pm||!pm.escenarios[i]) return;
   const esc=pm.escenarios[i];
   const snap=Object.assign({}, snapInputs(), esc.cambios);
-  ponerInputs(snap); generarInforme(true); go("s3");
+  ponerInputs(snap); generarInforme(true); try{marcarCampos(Object.keys(esc.cambios),"fld-amarillo");}catch(e){} go("s3");
   const box=$("planMejoraBox");
-  if(box) box.insertAdjacentHTML("afterbegin","<div class='alert ok'>Escenario aplicado: <b>"+escH(esc.titulo)+"</b>. Regenere el plan para ver el nuevo diagnóstico.</div>");
+  if(box) box.insertAdjacentHTML("afterbegin","<div class='alert ok'>Escenario aplicado: <b>"+escH(esc.titulo)+"</b>. Los campos modificados quedaron en <b>amarillo</b> en el formulario para explicarlos al dueño del proyecto. Regenere el plan para ver el nuevo diagnóstico.</div>");
 }
 function pintarPlanMejora(){
   const box=$("planMejoraBox"); if(!box) return;
@@ -3140,6 +3146,68 @@ function planMejoraSecCliente(r){
   if(pm.escenarios.length){ h+="<ul class='list'>"+pm.escenarios.map(function(e){ return "<li><b>"+escH(e.titulo)+":</b> "+e.cambiosTexto.map(escH).join(" · ")+" → <b>"+escH(e.dict)+"</b>.</li>"; }).join("")+"</ul>"; }
   h+="<div class='tblwrap'><table class='t'><tr><th>Fase</th><th>Acción</th><th>Indicador</th></tr>"+pm.acciones.map(function(a){ return "<tr><td>"+escH(a.fase)+"</td><td style='text-align:left'>"+escH(a.accion)+"</td><td style='text-align:left'>"+escH(a.indicador)+"</td></tr>"; }).join("")+"</table></div></div>";
   return h;
+}
+
+/* ---- MARCAS ROJO/AMARILLO + LENGUAJE CLARO ---- */
+function limpiarMarcas(){ try{ document.querySelectorAll(".fld-rojo,.fld-amarillo").forEach(function(el){ el.classList.remove("fld-rojo"); el.classList.remove("fld-amarillo"); }); }catch(e){} }
+function marcarCampos(ids, cls){ try{ ids.forEach(function(id){ const el=document.getElementById(id); if(el&&!el.disabled) el.classList.add(cls); }); }catch(e){} }
+function aspectoAIds(w){
+  switch(w){
+    case "mercado": return ["precio","ocupacion","capacidad"];
+    case "operativa": return ["fijoAlquiler","fijoEnergia","fijoConect","fijoOtros","numTrab","salMedio"];
+    case "financiera": return ["precio","cvu","ocupacion","capacidad"];
+    case "equilibrio": return ["precio","cvu","capacidad","ocupacion","fijoAlquiler","fijoEnergia","fijoConect","fijoOtros"];
+    case "prestamo": return ["recPropios","prestBanco"];
+    case "riesgo": return ["fijoEnergia","depImp","shrInput","mkInput"];
+    case "confianza": return ["salMedio","fijoAlquiler"];
+    default: return [];
+  }
+}
+function marcarRojosSegunDict(){
+  limpiarMarcas();
+  try{
+    if(!ultimoResultado) return;
+    const debil=diagnosticarPlan(ultimoResultado);
+    const ids=[]; debil.forEach(function(w){ aspectoAIds(w.id).forEach(function(id){ if(ids.indexOf(id)<0) ids.push(id); }); });
+    marcarCampos(ids,"fld-rojo");
+  }catch(e){}
+}
+function cambioSec(r){
+  try{
+    const debil=diagnosticarPlan(r);
+    if(!debil.length) return "<div class='alert ok'>Todo en rango: ningún campo exige cambios.</div>";
+    const esV=nivelPlan(r)===2;
+    let h="<div class='"+(esV?"alert warn":"alert bad")+"'><b>"+(esV?"Aunque el proyecto es viable, conviene mejorar:":"Para que sea factible debe cambiar:")+"</b></div><div class='tblwrap'><table class='t'><tr><th>Aspecto</th><th>Campo(s) a cambiar</th><th>Qué hacer</th></tr>";
+    const techo=(r.refInformal>0?r.refInformal:Math.round(r.precio*1.5));
+    debil.forEach(function(w){
+      const ids=aspectoAIds(w.id);
+      const nombres=ids.map(function(id){ const lb=document.querySelector("label[for='"+id+"']"); return lb?lb.textContent.trim().slice(0,40):id; }).join(", ")||"—";
+      let que=w.meta;
+      if(w.id==="mercado") que="Acercar precio a "+fmt(techo)+" CUP (calle) y subir ocupación con ventas y alianzas.";
+      if(w.id==="financiera") que="Bajar cvu (~25% compra mayorista) y/o subir precio; recortar fijos ~20%.";
+      if(w.id==="equilibrio") que="Bajar el punto de equilibrio: menos fijos o más precio y ocupación.";
+      if(w.id==="prestamo") que="Cerrar brecha de "+fmt((r.prestNec||0)-(r.prestBanco||0))+" CUP (más propios o crédito aprobado).";
+      if(w.id==="operativa") que="Recortar fijos ~20% y asegurar 2–3 proveedores + respaldo de energía.";
+      h+="<tr><td style='text-align:left'><b>"+escH(w.aspecto)+"</b></td><td style='text-align:left'>"+escH(nombres)+"</td><td style='text-align:left'>"+escH(que)+"</td></tr>";
+    });
+    return h+"</table></div><p class='hint marca-leyenda'>Los mismos campos están marcados en rojo en el formulario. Al aplicar una ruta del plan de mejora se marcan en amarillo.</p>";
+  }catch(e){ return ""; }
+}
+function simpleSec(r){
+  try{
+    const e=r.exp||{};
+    const empleosTot=(e.empleos>0?e.empleos:(val("numTrab")+val("numSocios")))||0;
+    const cuando=isFinite(r.pri)?("se recupera en "+fmt1(r.pri)+" meses"):"todavía no se recupera solo";
+    return "<div class='psimple'><b>En palabras simples:</b> "+escH(r.nombre)+" "+(nivelPlan(r)===2?"sí gana dinero":"todavía no gana lo suficiente")+". Deja <b>"+fmt(r.utilNeta)+" CUP al mes</b> y "+cuando+". Da trabajo a <b>"+empleosTot+" personas</b> de "+escH(r.m)+" y aporta al fisco cada mes. "+(nivelPlan(r)===2?"Aprobarlo pone ese dinero a circular en el municipio.":"Con los cambios en rojo puede llegar a ser factible y entonces sí conviene aprobarlo.")+"</div>";
+  }catch(e){ return ""; }
+}
+function importaSec(r){
+  try{
+    const e=r.exp||{};
+    const empleosTot=(e.empleos>0?e.empleos:(val("numTrab")+val("numSocios")))||0;
+    const fiscalAnual=Math.round((r.impVentasMes+r.impUtilMes+r.tribNom+r.cuotaSocios)*12);
+    return "<div class='pimport'><b>Por qué importa aprobarlo:</b> "+empleosTot+" empleos con salario, "+fmt(fiscalAnual)+" CUP al año para servicios públicos, más oferta de "+escH(r.sector)+" a "+fmt(r.precio)+" CUP en "+escH(r.m)+", y sustitución de importaciones del "+((e.sust||0)||0)+"%. Cada mes sin aprobar es un mes sin esos ingresos para la comunidad.</div>";
+  }catch(e){ return ""; }
 }
 
 /* ---- GUARDADOS ---- */

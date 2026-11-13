@@ -152,3 +152,16 @@ La credencial que traía el paquete quedó RETIRADA del código.
 - Selectores de uso bloqueados en «informal»; la columna formal BCC queda
   solo como referencia y se eliminó la comparación oficial-vs-informal del
   informe. Informes, cliente y presentación declaran tasa informal.
+- NOTA: el enlace público ejecuta la última versión GUARDADA; tras estos
+  cambios hay que guardar el generador en el editor para publicar el código
+  actual.
+
+## Marcas rojo/amarillo + lenguaje claro (2026-11-14)
+- Al generar el estudio, los campos que deben cambiar se marcan en rojo en
+  el formulario y el informe trae la tabla «Para que sea factible debe
+  cambiar» (aspecto, campos y qué hacer).
+- Al aplicar una ruta del plan de mejora, los campos modificados quedan en
+  amarillo para explicarlos al dueño del proyecto (limpiar plan quita el
+  amarillo).
+- Informe técnico con «En palabras simples» y «Por qué importa aprobarlo»
+  (empleos, aporte fiscal anual, oferta local) para lectores no técnicos.
