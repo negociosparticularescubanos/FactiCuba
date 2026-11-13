@@ -242,6 +242,18 @@ body.locked .wrap,body.locked .topbar{display:none !important}
 #tecDoc{background:#fff;border-radius:8px;padding:26px 24px;color:#141414}
 #tecDoc .dict{margin-top:0}
 @media print{ #tecDoc{padding:0} }
+/* ---------- Vista impresión informe técnico (solo el documento) ---------- */
+body.ver-tecnico{background:#fff;background-image:none}
+body.ver-tecnico .topbar,body.ver-tecnico .nav{display:none !important}
+body.ver-tecnico .wrap{max-width:900px;margin:0 auto;padding:0}
+body.ver-tecnico .grid{display:block}
+body.ver-tecnico #s1,body.ver-tecnico #s2,body.ver-tecnico #s4,body.ver-tecnico #s5{display:none !important}
+body.ver-tecnico #s3{display:block !important;box-shadow:none;border:none;background:#fff}
+body.ver-tecnico #s3>.btnrow,body.ver-tecnico #shareStatus{display:none !important}
+body.ver-tecnico #s3>h2,body.ver-tecnico #s3>.sub{display:none !important}
+body.ver-tecnico #informeBox{display:block !important}
+body.ver-tecnico .doc-sec{break-inside:avoid}
+body.ver-tecnico .tblwrap{overflow:visible;box-shadow:none}
 body.ver-cliente{background:#8fa0b8}
 body.ver-cliente #clienteDoc{display:block;max-width:900px;margin:0 auto;padding:24px 22px 60px;border-radius:6px}
 body.ver-cliente .wrap,body.ver-cliente .topbar{display:none}
@@ -252,7 +264,8 @@ body.ver-cliente .wrap,body.ver-cliente .topbar{display:none}
 .doc-sec{margin:20px 0}
 .doc-sec h2{font-size:17px;border-bottom:2px solid #0f172a;padding-bottom:5px;margin:0 0 10px}
 .doc-sec p,.doc-sec li{font-size:13.5px;line-height:1.55}
-.doc-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.doc-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+@media(max-width:700px){.doc-kpi{grid-template-columns:repeat(2,1fr)}}
 .doc-kpi div{border:1px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center}
 .doc-kpi b{display:block;font-size:16px}
 .doc-kpi span{font-size:11px;color:#475569}
@@ -649,7 +662,7 @@ body.ver-cliente .wrap,body.ver-cliente .topbar{display:none}
           <p class="sub">Cuatro bloques + finanzas + riesgos + dictamen. Use Guardar para conservarlo en este navegador.</p>
           <div class="btnrow">
             <button class="btn btn-g" onclick="guardarEstudio()"><svg class="ic"><use href="#i-save"/></svg> Guardar estudio</button>
-            <button class="btn btn-p" onclick="window.print()"><svg class="ic"><use href="#i-doc"/></svg> Informe técnico / PDF</button>
+            <button class="btn btn-p" onclick="imprimirTecnico()"><svg class="ic"><use href="#i-doc"/></svg> Informe técnico / PDF</button>
             <button class="btn btn-o" onclick="verCliente()"><svg class="ic"><use href="#i-doc"/></svg> Informe cliente (PDF formal)</button>
             <button class="btn btn-d" onclick="compartirEstudio()"><svg class="ic"><use href="#i-link"/></svg> Compartir (enlace)</button>
             <button class="btn btn-d" onclick="go('s4')">Ver guardados →</button>
@@ -2673,6 +2686,15 @@ function webSec(r){
 }
 /* ---- Informe cliente (documento formal para PDF) ---- */
 function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=((h<<5)-h+s.charCodeAt(i))|0; } return h; }
+function imprimirTecnico(){
+  if(!ultimoResultado){ $("informeBox").insertAdjacentHTML("afterbegin",'<div class="alert warn">Primero pulse «Generar estudio completo».</div>'); go("s3"); return; }
+  renderInforme();
+  document.body.classList.remove("ver-cliente");
+  document.body.classList.add("ver-tecnico");
+  window.scrollTo(0,0);
+  setTimeout(function(){ window.print(); }, 120);
+  setTimeout(function(){ document.body.classList.remove("ver-tecnico"); }, 800);
+}
 function verCliente(){
   if(!ultimoResultado){ $("informeBox").insertAdjacentHTML("afterbegin",'<div class="alert warn">Primero genere el informe técnico.</div>'); go("s3"); return; }
   renderCliente();

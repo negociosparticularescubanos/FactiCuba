@@ -1,0 +1,89 @@
+{
+ "actualizado": "2026-11-13",
+ "descripcion": "Base de conocimiento viva de FactiCuba. La mantienen los agentes autónomos del propio sistema: el Vigía integrado en la app (estudia las fuentes oficiales cada vez que se abre, sin depender de nadie) y el Aprendiz de Apps Script en la cuenta de Google del negocio (revisión diaria automática). Solo entran novedades con fuente; las detecciones automáticas se marcan «sin verificar» y los parámetros legales solo cambian tras confirmación.",
+ "entradas": [
+  {
+   "fecha": "2026-11-13",
+   "tipo": "metodologia",
+   "titulo": "Metodología del consultor: prioridades estratégicas y estructura del estudio",
+   "resumen": "Toda evaluación pondera las 6 prioridades del país (divisas o sustitución de importaciones, soberanía alimentaria, transición energética/FRE, encadenamientos productivos locales, impacto social y territorial, sostenibilidad ambiental CITMA). Estructura en 7 capítulos (resumen, mercado, técnico, organizacional-legal-ambiental, económico-financiero, evaluación-riesgos-sensibilidad, conclusiones). Evaluación: VAN>0 con tasa de descuento 10-15 %, TIR superior a la tasa, PRI simple Y descontado, relación B/C y punto de equilibrio; escenarios Pesimista (ventas -20 %, insumos +30 %), Base y Optimista. Fuentes obligatorias: ONEI y EDM, MFP, UNE, INRH, CUPET, ETECSA, proformas de importadoras (CIF + aranceles), Ley 113/ONAT, BCC y banca comercial, DMOTU/ONN/MINSAP/CITMA. Regla de oro: si faltan datos críticos se piden en lista estructurada; nada se inventa sin marcarlo como supuesto explícito.",
+   "fuente": "Metodología aportada por Leonardo (2026-11-13), archivo METODOLOGIA-CONSULTOR.md del proyecto",
+   "fuenteUrl": "",
+   "aplica": "Tarjeta de Prioridades estratégicas, escenarios de sensibilidad y PRI descontado de FactiCuba; estructura de la propuesta redactada"
+  },
+  {
+   "aplica": "Redactor de propuestas y tarjeta de Trámites",
+   "fecha": "2026-11-13",
+   "fuente": "Granma, «Nuevas reglas para impulsar el desarrollo desde lo local», 29-10-2026 (Gaceta Oficial No. 87/2026)",
+   "fuenteUrl": "https://www.granma.cu/cuba/2026-10-29/nuevas-reglas-para-impulsar-el-desarrollo-desde-lo-local-29-10-2026-18-10-45",
+   "resumen": "El expediente que se presenta a la Dirección de Desarrollo Municipal/Territorial incluye titulares, diagnóstico, objetivos, metas, cronograma, empleos y financiamiento. Los proyectos económico-productivos llevan análisis de viabilidad económica; los demás, costo-beneficio e impacto social y ambiental. Para aprobarse, el proyecto debe encajar con la estrategia municipal y tener el financiamiento garantizado. Duración máxima 5 años, objeto distinto a la actividad habitual de los titulares y evaluación al menos semestral por el CAM.",
+   "tipo": "norma",
+   "titulo": "Decreto 174/2026: el expediente del PDL y sus condiciones de aprobación"
+  },
+  {
+   "aplica": "Criterios de evaluación de FactiCuba",
+   "fecha": "2026-11-13",
+   "fuente": "Granma, 29-10-2026 (paquete normativo de la Gaceta Oficial No. 87/2026)",
+   "fuenteUrl": "https://www.granma.cu/cuba/2026-10-29/nuevas-reglas-para-impulsar-el-desarrollo-desde-lo-local-29-10-2026-18-10-45",
+   "resumen": "El Ministerio de Economía y Planificación actualizó los métodos para elaborar y gestionar las estrategias territoriales y los proyectos de desarrollo local que acompañan al Decreto 174/2026.",
+   "tipo": "norma",
+   "titulo": "Resolución 70/2026 del MEP: métodos actualizados de elaboración"
+  },
+  {
+   "aplica": "Financiamiento y evaluación bancaria",
+   "fecha": "2026-11-13",
+   "fuente": "Granma, 29-10-2026; Gaceta Oficial No. 87/2026",
+   "fuenteUrl": "https://www.granma.cu/cuba/2026-10-29/nuevas-reglas-para-impulsar-el-desarrollo-desde-lo-local-29-10-2026-18-10-45",
+   "resumen": "Fuentes reconocidas: Fondo para el Desarrollo Local, fondos de fideicomiso (comisión del 4 %), presupuesto provincial, fondos ambientales y de ciencia, cooperación internacional, recursos propios y créditos bancarios. El BCC regula las cuentas corrientes del PDL en CUP y en divisas con fuentes lícitas. La Resolución 202/2026 fija la tributación del PDL como contribuyente propio ante la ONAT.",
+   "tipo": "norma",
+   "titulo": "Financiamiento PDL: Resolución 202/2026 del MFP y Resolución 118/2026 del BCC"
+  },
+  {
+   "aplica": "Factibilidad integral 2026 (modalidad automática)",
+   "fecha": "2026-11-12",
+   "fuente": "MINCEX en FIHAV 2025 y paquete de Transformaciones Económicas y Sociales 2026 (176 medidas, aprobadas el 19-06-2026)",
+   "fuenteUrl": "",
+   "resumen": "Para proyectos con inversión extranjera se elimina el estudio de factibilidad y se sustituye por un Plan de Negocio; la Comisión evalúa en 7 días (antes 15) y rige el silencio positivo. El reglamento de la Ley 118 está en elaboración. Sin IED, el estudio de factibilidad sigue normado por la Resolución Conjunta 1/2022 MINCEX-MEP y el Decreto 327/2014.",
+   "tipo": "norma",
+   "titulo": "Transformaciones 2026 (176 medidas): la inversión extranjera pasa a Plan de Negocio"
+  },
+  {
+   "aplica": "Bloque de vivienda de la Factibilidad integral",
+   "fecha": "2026-11-12",
+   "fuente": "Gaceta Oficial No. 86/2026",
+   "fuenteUrl": "",
+   "resumen": "Vivienda adecuada: mínimo 25 m² útiles por vivienda (art. 12 del Reglamento). La certificación catastral tiene vigencia de 5 años (art. 18.4; Resoluciones INOTU 15/2026 y 16/2026). Las zonas especiales y patrimoniales exigen autorización (arts. 271-272). Vigentes desde el 21-10-2026 (Gaceta Oficial No. 86/2026).",
+   "tipo": "norma",
+   "titulo": "Ley 187/2026 de la Vivienda y Decreto 176/2026 (Reglamento General)"
+  },
+  {
+   "aplica": "Dimensión ambiental y tarjeta de Trámites",
+   "fecha": "2026-11-12",
+   "fuente": "Ley 150/2022 del Sistema de los Recursos Naturales y el Medio Ambiente; Resolución CITMA 132/2009",
+   "fuenteUrl": "",
+   "resumen": "Todo estudio valora el impacto ambiental; según la categoría del proyecto se exige Licencia Ambiental del CITMA y estudio de impacto ambiental. La gestión de desechos y las medidas de mitigación forman parte del expediente.",
+   "tipo": "norma",
+   "titulo": "Medio ambiente en los estudios: Ley 150/2022 y Resolución CITMA 132/2009"
+  },
+  {
+   "aplica": "Clasificación de proyectos en el expediente",
+   "fecha": "2026-11-12",
+   "fuente": "Granma, 29-10-2026",
+   "fuenteUrl": "https://www.granma.cu/cuba/2026-10-29/nuevas-reglas-para-impulsar-el-desarrollo-desde-lo-local-29-10-2026-18-10-45",
+   "resumen": "El Decreto 174/2026 reconoce proyectos económico-productivos, socioculturales, ambientales, institucionales y de investigación, desarrollo e innovación. Solo los económico-productivos exigen análisis de viabilidad económica completo; el resto se evalúa por costo-beneficio con impacto social y ambiental.",
+   "tipo": "criterio",
+   "titulo": "Los cinco tipos de proyectos de desarrollo local"
+  }
+ ],
+ "parametros": {
+  "certificacion_catastral_anios": 5,
+  "fideicomiso_pct": 4,
+  "ied_evaluacion_dias": 7,
+  "ied_silencio_positivo": true,
+  "pdl_duracion_max_anios": 5,
+  "pdl_evaluacion_semestral": true,
+  "pdl_tope_contratados": 100,
+  "vivienda_m2_minimos": 25
+ },
+ "version": 1
+}

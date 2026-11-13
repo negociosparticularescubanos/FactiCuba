@@ -1,0 +1,47 @@
+const fs = require('fs');
+const { JSDOM, VirtualConsole } = require('/home/hatch/workspace/finanzas-sheets/audit/node_modules/jsdom');
+const html = fs.readFileSync(process.env.HOME + '/workspace/facticuba-online/app-conectada/index.html', 'utf8');
+const CONOC = fs.readFileSync(process.env.HOME + '/workspace/facticuba-online/conocimiento.json', 'utf8');
+const vc = new VirtualConsole(); vc.on('jsdomError', () => {});
+const dom = new JSDOM(html, { url: 'https://negociosparticularescubanos.github.io/FactiCuba/', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: vc,
+  beforeParse(window) {
+    window.Response = Response; window.DecompressionStream = DecompressionStream;
+    window.fetch = (url) => { const u = String(url);
+      if (u.indexOf('conocimiento.json') >= 0) return Promise.resolve(new Response(CONOC, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      return Promise.reject(new Error('offline')); };
+    window.prompt = () => '123456'; window.scrollTo = () => {}; window.alert = () => {}; window.print = () => {};
+    window.HTMLElement.prototype.scrollIntoView = function () {};
+  } });
+const w = dom.window, d = w.document;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const hasta = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (fn()) return true; await sleep(400); } return fn(); };
+(async () => {
+  let ok = 0, bad = 0; const chk = (n, c, x) => { c ? ok++ : bad++; console.log((c ? '✔ ' : '✘ ') + n + (x ? ' — ' + x : '')); };
+  chk('la tarjeta «Tu estudio» aparece con sus 5 pestañas', await hasta(() => !!d.getElementById('estudioCard') && d.querySelectorAll('.pt-b').length === 5, 15000));
+  const S = (id, v) => { const e = d.getElementById(id); if (e) e.value = v; };
+  S('nomProy', 'Taller de bicicletas El Rayo'); S('sectorSel', 'Servicios técnicos / taller'); S('actorSel', 'mipyme_priv');
+  d.getElementById('provSel').value = 'Villa Clara'; w.cargarMun(); d.getElementById('muniSel').value = 'Santa Clara';
+  S('precio', 500); S('cvu', 200); S('capacidad', 1000); S('ocupacion', 70);
+  S('invLocal', 100000); S('invEquipos', 200000); S('invCapital', 50000); S('numTrab', 8); S('salMedio', 9500);
+  S('fAutCUP', 150000); S('fCredito', 200000); S('eObj', 'Crear un taller de reparación de bicicletas con servicio el mismo día.');
+  S('descProy', 'En la ciudad apenas funcionan dos talleres con esperas de semanas; la población depende de la bicicleta para trabajar y estudiar.');
+  S('eEncad', 'Compra de piezas a la tienda estatal y a productores locales de gomas y cámaras.');
+  S('eAporte', 'Beneficia a trabajadores y estudiantes que se trasladan en bicicleta; crea 8 empleos directos en el municipio.');
+  w.generarInforme(true);
+  chk('el resumen se llena solo: dictamen, VAN y la frase simple', await hasta(() => /Dictamen/.test(d.getElementById('pt-resumen').innerHTML) && /745/.test(d.getElementById('pt-resumen').innerHTML), 12000), d.getElementById('pt-resumen').innerHTML.length + ' car.');
+  chk('el resumen trae el semáforo social/ambiental y el PRI descontado', /Social/.test(d.getElementById('pt-resumen').innerHTML) && /PRI descontado/.test(d.getElementById('pt-resumen').innerHTML));
+  chk('mercado: territorio, tu precio y capacidad en su sitio', /Santa Clara/.test(d.getElementById('pt-mercado').innerHTML) && /Tu precio/.test(d.getElementById('pt-mercado').innerHTML));
+  chk('finanzas: inversión desglosada y proyección por años', /Capital de trabajo/.test(d.getElementById('pt-finanzas').innerHTML) && /Flujo neto/.test(d.getElementById('pt-finanzas').innerHTML));
+  d.querySelector('[data-tab="finanzas"]').click();
+  chk('cambiar de pestaña muestra su panel y oculta el resumen', d.getElementById('pt-finanzas').classList.contains('on') && !d.getElementById('pt-resumen').classList.contains('on'));
+  const F = w.fcFaltantes(); const total = F.reduce((a, x) => a + x.miss.length, 0);
+  chk('auditoría de faltantes: con el caso B solo falta el plan municipal', total === 1 && /Plan de desarrollo/.test(d.getElementById('pt-accion').innerHTML), 'faltan=' + total);
+  chk('cada faltante trae su botón «Ir al campo»', !!d.querySelector('#pt-accion [data-campo="eLineam"]'));
+  S('precio', ''); w.fcPestanasRender();
+  chk('si se vacía el precio, la auditoría lo detecta al momento', /Precio de venta/.test(d.getElementById('pt-accion').innerHTML) && !!d.querySelector('#pt-accion [data-campo="precio"]'));
+  const elP = d.getElementById('precio'); let focoLlamado = false; const f0 = elP.focus.bind(elP); elP.focus = () => { focoLlamado = true; try { f0(); } catch (e) {} };
+  d.querySelector('#pt-accion [data-campo="precio"]').click();
+  chk('el botón lleva al campo (foco + resaltado aplicados)', focoLlamado && elP.style.outline.indexOf('solid') >= 0, 'jsdom no mueve activeElement; se espía la llamada');
+  console.log(`\nRESULTADO PESTAÑAS: ${ok} ✔ / ${bad} ✘`);
+  process.exit(bad ? 1 : 0);
+})().catch(e => { console.log('FALLO DEL ARNÉS:', e.message); process.exit(2); });

@@ -1,0 +1,36 @@
+FACTICUBA — PROYECTO COMPLETO (actualizado 2026-11-13, 08:25)
+================================================
+
+QUÉ ES CADA COSA
+----------------
+app-conectada/index.html ... LA APP que está publicada en
+    https://negociosparticularescubanos.github.io/FactiCuba/
+    (un solo archivo: interfaz + motor + todos los módulos,
+    incluida la vista por pestañas y los Datos Vivos que llenan
+    solos combustibles, precio formal y equipamiento).
+conocimiento.json .......... Base de conocimiento viva de la app
+    (la lee al abrir; incluye la metodología del consultor).
+servidor/Code.gs ........... Servidor Apps Script v5 (base en la
+    hoja «FactiCuba DB» de Google Sheets, consola de agentes,
+    precios diarios). Misma URL /exec de siempre.
+servidor/Aprendiz.gs ....... Agente diario que estudia normas y
+    propone candidatas en conocimiento.json (cuenta del negocio).
+base-datos/FactiCuba_DB.xlsx  La base de datos completa (37
+    pestañas: 168 municipios ONEI, criterios, reglas, mejoras).
+base-datos/build_workbook.py  El generador de ese Excel.
+src/espejo/worker.js ....... El espejo web propio (tasas elTOQUE/
+    BCC/CUPET, buscar, Revolico) en Cloudflare Workers.
+index.html + main.pjs ...... El paquete original de partida.
+redactor-modulo.html ....... Módulo del redactor (referencia).
+arneses/ ................... Las pruebas automáticas (jsdom):
+    regresión, documentos, autollenado, vigía, consola, servidor,
+    precios vivos, metodología, pestañas y datos vivos.
+METODOLOGIA-CONSULTOR.md ... La metodología de evaluación que
+    aportó Leonardo (prioridades, estructura, criterios).
+AUDITORIA-UX.md ............ La auditoría de presentación que
+    originó la vista por pestañas.
+documentos/HANDOFF-AI.md ... El traspaso completo del proyecto
+    (estado, reglas, historia de cada ronda).
+documentos/folleto.pdf ..... El folleto promocional de FactiCuba.
+
+Todo el código es de Leonardo García Arteaga (FRANWE).
