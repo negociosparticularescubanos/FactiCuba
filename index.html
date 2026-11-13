@@ -433,7 +433,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid #38bdf8;outline-offset
         <div class="row">
           <div><label class="f" for="braveKey">Clave Brave Search (opcional, gratis en brave.com/search/api; solo este navegador)</label><input type="password" id="braveKey" autocomplete="off" placeholder="BSA-..."></div>
           <div><label class="f" for="tavilyKey">Clave Tavily (opcional, gratis en tavily.com; solo este navegador)</label><input type="password" id="tavilyKey" autocomplete="off" placeholder="tvly-..."></div>
-          <div><label class="f" for="pollinationsKey">Clave Pollinations — IA de apoyo (opcional, gratis en pollinations.ai; solo este navegador)</label><input type="password" id="pollinationsKey" autocomplete="off" placeholder="Pega aquí tu clave de Pollinations"></div>
         </div>
         <div class="row">
           <div><label class="f" for="webUrl">Traer texto de una URL concreta (ONEI, BCC, elToque, prensa…)</label><input type="text" id="webUrl" placeholder="Pegue https://… y pulse «Traer URL»"></div>
@@ -2962,49 +2961,56 @@ async function fcRespaldoInternet() {
   const mun = (document.getElementById("muniSel") || {}).value || "";
   const prov = (document.getElementById("provSel") || {}).value || "";
   const sec = (document.getElementById("sectorSel") || {}).value || "";
+  const secCorta = String(sec).split("/")[0].trim();
   const buscar = [];
-  if (falta("salMedio")) buscar.push({ id: "salMedio", nombre: "Salario medio", q: "salario medio mensual " + mun + " " + prov + " Cuba", labels: ["salario medio mensual", "salario medio", "salario promedio"], min: 1000, max: 150000 });
-  if (falta("fijoAlquiler")) buscar.push({ id: "fijoAlquiler", nombre: "Alquiler del local", q: "alquiler de local comercial " + mun + " Cuba precio mensual CUP", labels: ["alquiler", "renta del local", "arrendamiento"], min: 1000, max: 1000000 });
-  if (falta("refInformal")) buscar.push({ id: "refInformal", nombre: "Precio informal de referencia", q: "precio " + String(sec).split("/")[0].trim() + " " + mun + " Cuba CUP", labels: ["precio de", "precio", "cuesta"], min: 10, max: 200000 });
+  if (falta("salMedio")) buscar.push({ id: "salMedio", nombre: "Salario medio", q: "salario medio mensual " + mun + " " + prov + " Cuba", q2: "salario medio ONEI Cuba CUP", labels: ["salario medio mensual", "salario medio", "salario promedio"], min: 1000, max: 150000, wiki: true });
+  if (falta("fijoAlquiler")) buscar.push({ id: "fijoAlquiler", nombre: "Alquiler del local", q: "alquiler de local comercial " + mun + " Cuba precio mensual CUP", q2: "alquiler local " + mun + " CUP mensual", labels: ["alquiler", "renta del local", "arrendamiento"], min: 1000, max: 1000000 });
+  if (falta("refInformal")) buscar.push({ id: "refInformal", nombre: "Precio informal de referencia", q: "precio " + secCorta + " " + mun + " Cuba CUP", q2: "precio " + secCorta + " Cuba CUP", labels: ["precio de", "precio", "cuesta"], min: 10, max: 200000, revolico: (secCorta + " " + mun).trim() });
   if (!buscar.length) return;
   const hb = document.getElementById("hallBox");
   const caja = document.createElement("div");
-  if (hb) { caja.innerHTML = "<div class='alert warn' style='margin-top:8px'>🔎 El documento no trajo " + buscar.map(function (b) { return "<b>" + escH(b.nombre) + "</b>"; }).join(", ") + ": buscando datos reales en internet…</div>"; hb.appendChild(caja); }
+  if (hb) { caja.innerHTML = "<div class='alert warn' style='margin-top:8px'>🔎 El documento no trajo " + buscar.map(function (b) { return "<b>" + escH(b.nombre) + "</b>"; }).join(", ") + ": buscando datos reales en la web (buscador, Wikipedia y anuncios)…</div>"; hb.appendChild(caja); }
+  const mediana = function (arr) { const a = arr.slice().sort(function (x, y) { return x - y; }); return a.length % 2 ? a[(a.length - 1) / 2] : Math.round((a[a.length / 2 - 1] + a[a.length / 2]) / 2); };
   const filas = [], blancos = [];
   for (const b of buscar) {
-    let puesto = false;
-    try {
-      const rb = await fetchTexto(URL_ESPEJO_BUSCAR + "?q=" + encodeURIComponent(b.q), 15000);
-      if (rb && rb.txt) {
-        const jb = JSON.parse(rb.txt);
-        const vals = [], fuentes = [];
-        (jb.items || []).slice(0, 6).forEach(function (x) {
-          const r = fcNumTrasLocal((x.titulo || "") + " " + (x.extracto || ""), b.labels);
-          if (r && r.v >= b.min && r.v <= b.max) { vals.push(r.v); if (x.fuente && fuentes.indexOf(x.fuente) < 0) fuentes.push(x.fuente); }
-        });
-        if (vals.length) {
-          vals.sort(function (a, c) { return a - c; });
-          const med = vals.length % 2 ? vals[(vals.length - 1) / 2] : Math.round((vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2);
-          const el = document.getElementById(b.id);
-          if (el && !(parseFloat(el.value) > 0)) { el.value = med; filas.push({ c: b.nombre, v: fmt(med), ev: "Internet (" + (fuentes.slice(0, 2).join(", ") || "web") + ") — VERIFICAR" }); puesto = true; }
-        }
-      }
-    } catch (e) {}
-    if (!puesto) {
+    const vals = [], fuentes = [];
+    const anota = function (r, f) { if (r && r.v >= b.min && r.v <= b.max) { vals.push(r.v); if (f && fuentes.indexOf(f) < 0) fuentes.push(f); } };
+    for (const q of [b.q, b.q2]) {
       try {
-        const g = await fcPolliRespaldo(b);
-        if (g) { const el2 = document.getElementById(b.id); if (el2 && !(parseFloat(el2.value) > 0)) { el2.value = g.v; filas.push({ c: b.nombre, v: fmt(g.v), ev: g.ev }); puesto = true; } }
+        const rb = await fetchTexto(URL_ESPEJO_BUSCAR + "?q=" + encodeURIComponent(q), 15000);
+        if (rb && rb.txt) { const jb = JSON.parse(rb.txt); (jb.items || []).slice(0, 8).forEach(function (x) { anota(fcNumTrasLocal((x.titulo || "") + " " + (x.extracto || ""), b.labels), x.fuente || "web"); }); }
       } catch (e) {}
+      if (vals.length >= 2) break;
+    }
+    if (!vals.length && b.wiki) {
+      try {
+        let items = null;
+        try { items = await srcWikiEspejo(mun + " " + prov + " Cuba"); } catch (e) { items = await wikiBuscar(mun + " " + prov + " Cuba"); }
+        (items || []).slice(0, 5).forEach(function (x) { anota(fcNumTrasLocal((x.titulo || "") + " " + (x.extracto || ""), b.labels), "Wikipedia"); });
+      } catch (e) {}
+    }
+    if (!vals.length && b.revolico) {
+      try {
+        const items = await srcRevolicoEspejo(b.revolico);
+        const cups = [];
+        (items || []).forEach(function (x) { const c = aCUP(x.precio, x.moneda); if (c && c >= b.min && c <= b.max) cups.push(Math.round(c)); });
+        if (cups.length) { vals.push(mediana(cups)); if (fuentes.indexOf("Revolico (anuncios reales)") < 0) fuentes.push("Revolico (anuncios reales)"); }
+      } catch (e) {}
+    }
+    let puesto = false;
+    if (vals.length) {
+      const el = document.getElementById(b.id);
+      if (el && !(parseFloat(el.value) > 0)) { const med = mediana(vals); el.value = med; filas.push({ c: b.nombre, v: fmt(med), ev: "Web (" + (fuentes.slice(0, 3).join(", ") || "web") + ") — VERIFICAR" }); puesto = true; }
     }
     if (!puesto) blancos.push(b.nombre);
   }
   let ht = "";
   if (filas.length) {
-    ht += "<div class='alert ok'><b>Datos reales buscados en internet (" + filas.length + "):</b> revísalos, vienen de fuentes públicas y pueden variar por territorio.</div><div class='tblwrap'><table class='t'><tr><th>Campo</th><th>Valor</th><th>Procedencia</th></tr>";
+    ht += "<div class='alert ok'><b>Datos reales buscados en la web (" + filas.length + "):</b> revísalos, vienen de fuentes públicas y pueden variar por territorio.</div><div class='tblwrap'><table class='t'><tr><th>Campo</th><th>Valor</th><th>Procedencia</th></tr>";
     filas.forEach(function (f) { ht += "<tr><td style='text-align:left'>" + escH(f.c) + "</td><td class='mono'>" + escH(String(f.v)) + "</td><td style='text-align:left;color:#475569;font-size:12px'>" + escH(f.ev) + "</td></tr>"; });
     ht += "</table></div>";
   }
-  if (blancos.length) ht += "<div class='alert warn' style='margin-top:6px'>Sin dato claro en internet para: <b>" + blancos.map(escH).join(", ") + "</b>. Quedan en blanco para que los pongas tú.</div>";
+  if (blancos.length) ht += "<div class='alert warn' style='margin-top:6px'>Sin dato claro en la web para: <b>" + blancos.map(escH).join(", ") + "</b>. Quedan en blanco para que los pongas tú.</div>";
   caja.innerHTML = ht;
   if (filas.length) { try { actualizarTasasUI(); } catch (e) {} }
 }
@@ -3634,66 +3640,17 @@ function fcExtraPlan(txt) {
 </script>
 
 <script>
-/* ===== POLLINATIONS — IA DE APOYO EN LA BÚSQUEDA DE DATOS (2026-11-12) =====
-   Sustituye a Gemini por orden del dueño. La clave la pone él en el campo
-   «Clave Pollinations» del panel web y vive SOLO en su navegador
-   (localStorage, como Brave/Tavily). La app pública NO trae clave alguna.
-   Uso: cuando el buscador no encuentra un dato del respaldo (salario,
-   alquiler, precio informal), se le pregunta a Pollinations (endpoint
-   OpenAI-compatible verificado) y solo se rellena si responde un número
-   claro dentro de rango, marcado «IA Pollinations — VERIFICAR». Si
-   responde SIN DATO o falla, el campo queda en blanco. Al cargar, se
-   borra de este navegador cualquier clave de Gemini guardada antes. */
-(function () {
-  const _save = window.webKeysSave;
-  if (typeof _save === "function") {
-    window.webKeysSave = function (o) {
-      const prev = (typeof webKeys === "function") ? webKeys() : {};
-      ["brave", "tavily", "pollinations"].forEach(function (k) { if (o[k] === undefined && prev[k]) o[k] = prev[k]; });
-      return _save(o);
-    };
-    try { const wk = webKeys() || {}; if ("gemini" in wk) { delete wk.gemini; _save(wk); } } catch (e) {}
+/* ===== SIN IA (2026-11-12) =====
+   Por orden del dueño, los datos salen SOLO de búsquedas web reales
+   (buscador espejo, Wikipedia, Revolico y las tasas). Limpieza única:
+   borra de este navegador las claves de IA que versiones anteriores
+   pudieron guardar. */
+try {
+  if (!localStorage.getItem("facticuba_sin_ia_v1")) {
+    const wk = JSON.parse(localStorage.getItem("facticuba_webkeys_v1") || "{}");
+    delete wk.gemini; delete wk.pollinations;
+    localStorage.setItem("facticuba_webkeys_v1", JSON.stringify(wk));
+    localStorage.setItem("facticuba_sin_ia_v1", "1");
   }
-  function cargar() {
-    const el = document.getElementById("pollinationsKey"); if (!el) return;
-    try { const g = (webKeys() || {}).pollinations; if (g && !el.value) el.value = g; } catch (e) {}
-    if (!el.dataset.on) {
-      el.dataset.on = "1";
-      el.addEventListener("change", function () {
-        try { const wk = webKeys() || {}; wk.pollinations = el.value.trim(); webKeysSave(wk); } catch (e) {}
-      });
-    }
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargar); else cargar();
-})();
-function fcPolliClave() {
-  const el = document.getElementById("pollinationsKey");
-  const v = el && el.value ? el.value.trim() : "";
-  if (v) return v;
-  try { return ((webKeys() || {}).pollinations || "").trim(); } catch (e) { return ""; }
-}
-async function fcPolliRespaldo(b) {
-  const key = fcPolliClave(); if (!key) return null;
-  const pregunta = b.q + ". Responde SOLO en este formato: NUMERO | FUENTE (el número en CUP, sin texto adicional). Si no hay un dato claro y confiable, responde exactamente: SIN DATO.";
-  const ctrl = new AbortController(); const to = setTimeout(function () { ctrl.abort(); }, 45000);
-  try {
-    const r = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: pregunta }] }),
-      signal: ctrl.signal
-    });
-    clearTimeout(to);
-    if (!r.ok) return null;
-    const j = await r.json();
-    const txt = (((j.choices || [])[0] || {}).message || {}).content || "";
-    if (!txt || /SIN DATO/i.test(txt)) return null;
-    const m = txt.match(/(\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)/);
-    if (!m) return null;
-    const v = pn(m[1]);
-    if (!isFinite(v) || v < b.min || v > b.max) return null;
-    const fuente = (txt.split("|")[1] || "sin fuente citada").trim().slice(0, 60);
-    return { v: Math.round(v), ev: "IA Pollinations · " + fuente + " — VERIFICAR" };
-  } catch (e) { clearTimeout(to); return null; }
-}
+} catch (e) {}
 </script>
