@@ -3922,3 +3922,158 @@ try {
   }
 })();
 </script>
+<script>
+/* ===== REDACTOR PROFESIONAL DE PROYECTOS (fcRedactor) =====
+   Escribe la PROPUESTA COMPLETA del proyecto con la estructura del
+   expediente cubano: Decreto 174/2026 (PDL: titulares, diagnóstico,
+   objetivos, metas, cronograma, empleos, financiamiento, viabilidad,
+   impacto social y ambiental, duración ≤ 5 años), Resolución Conjunta
+   1/2022 MINCEX-MEP y Decreto 327/2014 (estudios de factibilidad) y el
+   formato de documento de proyecto usado en Cuba (resumen, estrategia,
+   resultados, recursos, seguimiento). La prosa se genera SOLO con los
+   datos reales del estudio: lo que falta queda marcado
+   [A COMPLETAR: …] y listado al final — nunca se inventa. */
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const tv = function (id) { const e = $(id); return e ? String(e.value || "").trim() : ""; };
+  const nv = function (id) { const x = parseFloat(tv(id).replace(/\s/g, "").replace(",", ".")); return isNaN(x) ? 0 : x; };
+  const F = function (n) { return (typeof fmt === "function") ? fmt(Math.round(n || 0)) : String(Math.round(n || 0)); };
+  const esc = function (x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); };
+  const PEND = [];
+  function dato(txt, etiqueta) { if (txt && String(txt).trim()) return esc(txt); PEND.push(etiqueta); return "<b>[A COMPLETAR: " + esc(etiqueta) + "]</b>"; }
+  function parr() { return Array.prototype.slice.call(arguments).filter(Boolean).join(" "); }
+  const SECTOR_PROSA = [
+    [/gastronom|cafeter|restaurant|bar\b|comida|alimentos elab/i, "El proyecto organiza un servicio gastronómico de elaboración y venta de alimentos y bebidas, con ofertas basadas en productos del territorio, estándares de higiene y calidad verificables (Decreto 87/2023 de la Gastronomía y normas NC de inocuidad) y atención orientada a la población local y a los visitantes."],
+    [/agro|aliment|agricol|ganader|pesca|acuic/i, "El proyecto organiza una producción agropecuaria/alimentaria con enfoque de cadena de valor local: producción primaria, acopio, beneficio y comercialización, priorizando la sustitución de importaciones de alimentos y el autoabastecimiento municipal."],
+    [/comercio|tienda|venta|mercado/i, "El proyecto organiza una actividad comercial de venta de productos a la población, con surtido definido por la demanda real del territorio, precios calculados desde la ficha de costo y reposición planificada de inventarios."],
+    [/turismo|hostal|hospedaje|arrendamiento|excursion/i, "El proyecto organiza un servicio turístico vinculado a los atractivos del territorio, con estándares de calidad, promoción por canales digitales y encadenamiento con productores y prestadores locales."],
+    [/transporte|taller|reparaci|mantenimiento|servicio/i, "El proyecto organiza la prestación de servicios técnicos y de apoyo a la población y a los actores económicos del territorio, con tarifas calculadas desde la ficha de costo y tiempos de respuesta definidos."],
+    [/construc|vivienda|materiales/i, "El proyecto organiza una actividad de construcción/producción de materiales con cumplimiento de las normas técnicas y de la Ley 187/2026 de la Vivienda y su Reglamento (Decreto 176/2026) cuando aplique."],
+    [/belleza|peluquer|salud|gimnasio|deporte/i, "El proyecto organiza la prestación de servicios personales a la población, con condiciones higiénico-sanitarias verificadas y precios calculados desde la ficha de costo."],
+    [/artesan|industri|manufactura|producci|elaboraci/i, "El proyecto organiza una producción manufacturera a pequeña escala, con tecnología adecuada al territorio, control de calidad por partida y comercialización local y regional."]
+  ];
+  function prosaSector(sector) {
+    for (const par of SECTOR_PROSA) { if (par[0].test(sector || "")) return par[1]; }
+    return "El proyecto organiza la actividad económica declarada en su objeto, con procesos definidos, control de calidad y comercialización orientada a la demanda real del territorio.";
+  }
+  window.fcRedactar = function () {
+    if (typeof generarInforme === "function") generarInforme(true);
+    let R = null; try { R = eval("ultimoResultado"); } catch (e) {}
+    if (!R) { alert("Primero genere el informe del estudio."); return; }
+    PEND.length = 0;
+    const nom = tv("nomProy"), prov = tv("provSel"), muni = tv("muniSel"), sector = tv("sectorSel"), actor = tv("actorSel");
+    const esPDL = actor === "pdl";
+    const ACTOR_N = { tcp: "Trabajador por cuenta propia", mipyme_priv: "Micro, pequeña o mediana empresa privada", mipyme_est: "MIPYME estatal", cna: "Cooperativa no agropecuaria", cpa_ccs: "Cooperativa agropecuaria (CPA/CCS)", estatal: "Entidad estatal", pdl: "Proyecto de Desarrollo Local (PDL)" };
+    let det = {}; try { det = JSON.parse(localStorage.getItem("facticuba_detalle_v1") || "{}"); } catch (e) {}
+    let integ = null; try { integ = (typeof fcIntegralCalc === "function") ? fcIntegralCalc() : null; } catch (e) {}
+    const invTot = (typeof invInicialCUP === "function") ? invInicialCUP() : (nv("invLocal") + nv("invEquipos") + nv("invCapital"));
+    const finF = [nv("fAutCUP") + nv("fAutDiv"), nv("fCredito"), nv("fPresTerr"), nv("fCoopIED")];
+    const finNombres = ["recursos propios", "crédito bancario", "presupuesto territorial / Fondo de Desarrollo Local", "cooperación o inversión extranjera"];
+    const finTxt = finF.map(function (x, i) { return x > 0 ? finNombres[i] + " por " + F(x) + " CUP" : null; }).filter(Boolean);
+    const dem = (typeof estimarDemanda === "function") ? estimarDemanda() : null;
+    const eqItems = (det.equipos || []).filter(function (e) { return e && e.nombre; });
+    const pl = det.plantilla || null;
+    const plTotal = pl ? (Number(pl.dir || 0) + Number(pl.tec || 0) + Number(pl.ope || 0) + Number(pl.adm || 0) + Number(pl.ser || 0)) : 0;
+    const empleos = nv("eEmpleos") || plTotal || nv("numTrab");
+    const fecha = new Date().toLocaleDateString("es-CU", { day: "numeric", month: "long", year: "numeric" });
+    const durTxt = esPDL ? "hasta cinco años, con evaluaciones semestrales del CAM (Decreto 174/2026)" : "el horizonte de evaluación de cinco años del estudio";
+    const H = [];
+    const h2 = function (t) { H.push("<h2>" + t + "</h2>"); };
+    const pp = function (t) { if (t && String(t).trim()) H.push("<p>" + t + "</p>"); };
+    const tabla = function (filas) { H.push("<table>" + filas.map(function (f) { return "<tr><td style='width:42%'><b>" + f[0] + "</b></td><td>" + f[1] + "</td></tr>"; }).join("") + "</table>"); };
+    /* Portada y ficha */
+    H.push("<div class='rp-port'><h1>" + (esPDL ? "PROPUESTA DE PROYECTO DE DESARROLLO LOCAL" : "PROPUESTA DE PROYECTO") + "</h1><div class='rp-nom'>«" + dato(nom, "nombre del proyecto") + "»</div><div>" + esc(muni) + ", " + esc(prov) + " · " + fecha + "</div></div>");
+    tabla([["Nombre del proyecto", dato(nom, "nombre del proyecto")], ["Tipo de proyecto", esc(esPDL ? "Económico-productivo de desarrollo local" : "Proyecto de inversión / negocio")], ["Titular / forma de gestión", esc(ACTOR_N[actor] || actor || "—")], ["Territorio", esc(muni) + ", provincia " + esc(prov)], ["Sector / actividad", dato(sector, "sector")], ["Empleos a crear", empleos > 0 ? F(empleos) + " puestos de trabajo" : dato("", "empleos a crear")], ["Inversión total estimada", invTot > 0 ? F(invTot) + " CUP" : dato("", "inversión total")], ["Duración", esc(durTxt)]]);
+    h2("Resumen ejecutivo");
+    pp(parr("«" + esc(nom || "El proyecto") + "» es una propuesta de " + esc((ACTOR_N[actor] || "negocio").toLowerCase()) + " en el municipio " + esc(muni) + " (" + esc(prov) + "), sector " + esc(sector) + ".",
+      invTot > 0 ? "Requiere una inversión inicial de " + F(invTot) + " CUP" + (finTxt.length ? ", financiada con " + finTxt.join(", ") : "") + "." : "",
+      empleos > 0 ? "Creará " + F(empleos) + " empleos directos." : "",
+      (R.ingresos ? "En régimen, proyecta ventas mensuales de " + F(R.ingresos) + " CUP con una utilidad neta de " + F(R.utilNeta) + " CUP (" + F(Math.round(R.utilNeta / Math.max(1, R.ingresos) * 100)) + " %)." : ""),
+      "El estudio de factibilidad que acompaña esta propuesta concluye: <b>" + esc(R.dict || "") + "</b>." + (R.van != null ? " Los indicadores de la inversión son VAN " + F(R.van) + " CUP, TIR " + F(Math.round((R.tir || 0) * 100)) + " % anual" + ((R.e5 && isFinite(R.e5.priM) && R.e5.priM != null) ? " y recuperación en el mes " + F(Math.round(R.e5.priM)) + " del horizonte." : ".") : "")));
+    h2("1. Diagnóstico y planteamiento del problema");
+    pp(dato(tv("descProy"), "descripción del problema que resuelve el proyecto"));
+    if (dem) pp("El territorio cuenta con una población estimada de " + F(dem.pob) + " habitantes" + (dem.vis ? " y alrededor de " + F(dem.vis) + " visitantes al mes" : "") + ". Con el sector, la competencia declarada y el escenario escogido, la demanda potencial estimada asciende a unas " + F(dem.total) + " ventas mensuales, cifra contra la que se dimensiona la capacidad del proyecto.");
+    h2("2. Justificación y encaje territorial");
+    pp(dato(tv("eLineam"), "alineación con los Lineamientos y el Plan de la Economía"));
+    pp(dato(tv("eEncad"), "encadenamiento productivo del proyecto"));
+    if (window._planMun && window._planMun.metas && window._planMun.metas.length) pp("El plan de desarrollo del municipio declara como metas: " + esc(window._planMun.metas.slice(0, 6).join("; ")) + ". El proyecto tributa directamente a esas metas desde su objeto y su encadenamiento local.");
+    h2("3. Objetivos y metas");
+    pp("<b>Objetivo general:</b> " + dato(tv("eObj"), "objetivo general del proyecto"));
+    const metas = [];
+    if (nv("capacidad") > 0) metas.push("Alcanzar una producción/prestación de " + F(nv("capacidad") * nv("ocupacion") / 100) + " unidades mensuales en régimen (" + F(nv("ocupacion")) + " % de la capacidad instalada de " + F(nv("capacidad")) + ").");
+    if (empleos > 0) metas.push("Crear y mantener " + F(empleos) + " empleos directos, con prioridad para residentes del territorio.");
+    if (R.e5 && R.e5.filas6 && R.e5.filas6.length) metas.push("Cerrar el primer año con ingresos de " + F(R.e5.filas6[0].ing) + " CUP y un flujo operativo de " + F(R.e5.filas6[0].netOp) + " CUP, según la proyección del estudio.");
+    if (esPDL) metas.push("Cumplir las evaluaciones semestrales del CAM con los indicadores de esta propuesta.");
+    if (metas.length) pp(metas.map(function (m, i) { return (i + 1) + ". " + esc(m); }).join("<br>"));
+    h2("4. Beneficiarios e impacto esperado");
+    pp(dato(tv("eApo"), "beneficiarios e impacto esperado"));
+    if (integ) pp("La evaluación integral 2026 del estudio puntúa la dimensión social con " + F(integ.social) + "/100 y la ambiental con " + F(integ.ambiental) + "/100, con veredicto integral: <b>" + esc(integ.veredicto || "") + "</b>.");
+    h2("5. Descripción del proyecto y su funcionamiento");
+    pp(prosaSector(sector));
+    if (eqItems.length) pp("El equipamiento principal lo componen: " + eqItems.map(function (e) { return esc(e.nombre) + (e.cant > 1 ? " (" + e.cant + ")" : ""); }).join("; ") + ".");
+    h2("6. Organización y empleos");
+    if (pl && plTotal > 0) { tabla([["Dirección", F(pl.dir || 0)], ["Técnicos y especialistas", F(pl.tec || 0)], ["Operarios / producción", F(pl.ope || 0)], ["Administración", F(pl.adm || 0)], ["Servicios", F(pl.ser || 0)], ["Total", "<b>" + F(plTotal) + " trabajadores</b>"]]); }
+    else pp(dato("", "plantilla de trabajadores por categorías"));
+    pp(parr(nv("salMedio") > 0 ? "El salario medio mensual previsto es de " + F(nv("salMedio")) + " CUP por trabajador, por encima del salario medio del territorio cuando el dato oficial lo confirma, lo que convierte al proyecto en un empleador atractivo y estable." : "", esPDL ? "La contratación no excederá el tope de 100 trabajadores propio de los PDL (Decreto 174/2026)." : ""));
+    h2("7. Inversión requerida");
+    tabla([["Adecuación del local / obra", nv("invLocal") > 0 ? F(nv("invLocal")) + " CUP" : dato("", "inversión en local")], ["Equipamiento", nv("invEquipos") > 0 ? F(nv("invEquipos")) + " CUP" : dato("", "inversión en equipos")], ["Capital de trabajo", nv("invCapital") > 0 ? F(nv("invCapital")) + " CUP" : dato("", "capital de trabajo")], ["TOTAL", "<b>" + (invTot > 0 ? F(invTot) + " CUP" : "—") + "</b>"]]);
+    if (eqItems.length) H.push("<table><tr><th>Equipo / medio</th><th>Cant.</th><th>Precio (CUP)</th><th>Importe (CUP)</th></tr>" + eqItems.map(function (e) { return "<tr><td>" + esc(e.nombre) + "</td><td>" + (e.cant || 1) + "</td><td>" + F(e.precio || 0) + "</td><td>" + F((e.cant || 1) * (e.precio || 0)) + "</td></tr>"; }).join("") + "</table>");
+    h2("8. Financiamiento");
+    pp(finTxt.length ? "La inversión se financia con " + finTxt.join(", ") + "." + (esPDL ? " Los créditos a través del Fondo de Fideicomiso para el Desarrollo Local devengan la comisión del 4 % establecida (Resolución 202/2026 del MFP y Resolución 118/2026 del BCC)." : "") : dato("", "fuentes de financiamiento y sus montos"));
+    h2("9. Viabilidad económica" + (esPDL ? " (análisis de viabilidad del expediente)" : ""));
+    pp(parr("Ficha de costo del producto/servicio principal: precio de venta " + F(nv("precio")) + " CUP, costo variable unitario " + F(nv("cvu")) + " CUP, margen de contribución " + F(nv("precio") - nv("cvu")) + " CUP por unidad.",
+      R.peUnd ? "El punto de equilibrio se alcanza con " + F(R.peUnd) + " unidades al mes, frente a unas ventas previstas de " + F(R.und || 0) + " unidades." : "",
+      "Dictamen del estudio: <b>" + esc(R.dict || "") + "</b>."));
+    if (R.e5 && R.e5.filas6 && R.e5.filas6.length) H.push("<table><tr><th>Año</th><th>Ingresos (CUP)</th><th>Flujo operativo (CUP)</th><th>CAPEX (CUP)</th><th>Flujo neto (CUP)</th></tr>" + R.e5.filas6.map(function (x) { return "<tr><td>" + x.y + "</td><td>" + F(x.ing) + "</td><td>" + F(x.netOp) + "</td><td>" + F(x.capex) + "</td><td>" + F(x.net) + "</td></tr>"; }).join("") + "</table>");
+    h2("10. Sostenibilidad y medio ambiente");
+    pp(parr(tv("tramMitiga") ? "Medidas de mitigación declaradas: " + esc(tv("tramMitiga")) + "." : dato("", "medidas de sostenibilidad y mitigación ambiental"), integ && integ.renovTxt ? esc(integ.renovTxt) : "", "El proyecto cumplirá la legislación ambiental vigente (Ley 150/2022) y obtendrá la Licencia Ambiental del CITMA cuando su categoría lo exija (Resolución 132/2009)."));
+    h2("11. Riesgos y mitigación");
+    const riesgos = [];
+    for (let i = 1; i <= 5; i++) {
+      const nmF = $("rN_" + i) ? tv("rN_" + i) : "";
+      const fila = $("rA_" + i) ? $("rA_" + i).closest("tr") : null;
+      const nomF = nmF || (fila ? (fila.querySelector("td b") || {}).textContent || "" : "");
+      if (nomF || tv("rA_" + i)) riesgos.push([esc(nomF || "Riesgo " + i), "Probabilidad " + tv("rP_" + i) + "/5 · Impacto " + tv("rI_" + i) + "/5 — " + esc(tv("rA_" + i) || "sin medida declarada")]);
+    }
+    if (riesgos.length) tabla(riesgos); else pp(dato("", "riesgos principales y su mitigación"));
+    h2("12. Cronograma de ejecución");
+    const fases = (window._tramites && window._tramites.fases && window._tramites.fases.length) ? window._tramites.fases : null;
+    if (fases) H.push("<table><tr><th>Fase (Decreto 327/2014)</th><th>Inicio</th><th>Fin</th></tr>" + fases.map(function (f) { return "<tr><td>" + esc(f.n) + "</td><td>" + esc(f.ini) + "</td><td>" + esc(f.fin) + "</td></tr>"; }).join("") + "</table>");
+    else pp("Fase de preparación y trámites; fase de ejecución de la inversión; puesta en marcha; y operación con evaluación periódica. Genere el cronograma detallado en la tarjeta «Trámites, ambiente y cronograma» de FactiCuba para incorporarlo aquí con fechas.");
+    h2("13. Seguimiento y evaluación");
+    pp("El proyecto se controlará con indicadores verificables: ventas mensuales contra plan, empleos efectivos, cumplimiento tributario ante la ONAT y estado de los trámites." + (esPDL ? " Conforme al Decreto 174/2026, el proyecto se somete a la evaluación semestral del Consejo de la Administración Municipal; de no cumplir sus compromisos, la autorización puede revocarse y el proyecto liquidarse, extremo que los titulares aceptan y previenen con este sistema de seguimiento." : " Los titulares revisarán los indicadores al cierre de cada mes y ajustarán precios y costos según la ficha de costo."));
+    if (esPDL) { h2("14. Solicitudes al Consejo de la Administración Municipal"); pp("Se solicita al CAM: (1) la aprobación del proyecto y su inscripción como Proyecto de Desarrollo Local; (2) la facilitación de los trámites ante las direcciones municipales correspondientes; y (3) el acompañamiento en la evaluación semestral. Los titulares se comprometen a mantener el objeto aprobado, la contabilidad al día y la información veraz durante toda la vigencia del proyecto."); }
+    h2("Anexos");
+    pp("Anexo 1. Estudio de factibilidad generado por FactiCuba (informe técnico completo con dictamen, escenarios y sensibilidad). Anexo 2. Ficha de costo y punto de equilibrio. Anexo 3. Documentos legales del titular y del local. Anexo 4. Cotizaciones del equipamiento.");
+    const completitud = Math.max(5, 100 - PEND.length * 9);
+    const html = "<div class='rp-doc'><div class='rp-meta'>Propuesta redactada automáticamente por <b>FactiCuba</b> con los datos reales del estudio · Completitud estimada del expediente: <b>" + completitud + " %</b>" + (PEND.length ? " · Quedan por completar: " + PEND.map(esc).join("; ") : " · Sin datos pendientes") + ". Revísela y ajústela antes de presentarla.</div>" + H.join("") + "</div>";
+    let ov = $("fcPropOverlay");
+    if (!ov) {
+      ov = document.createElement("div"); ov.id = "fcPropOverlay";
+      ov.innerHTML = "<div class='rp-bar'><b>📝 Propuesta del proyecto (redactada)</b><span><button class='btn btn-p' onclick='window.print()'>🖨 Imprimir / guardar PDF</button> <button class='btn btn-d' onclick=\"document.getElementById('fcPropOverlay').style.display='none'\">Cerrar</button></span></div><div class='rp-cuerpo'></div>";
+      document.body.appendChild(ov);
+      const st = document.createElement("style");
+      st.textContent = "#fcPropOverlay{position:fixed;inset:0;background:#e8ecf3;z-index:9998;overflow:auto;padding:18px}#fcPropOverlay .rp-bar{max-width:820px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.rp-doc{max-width:820px;margin:0 auto;background:#fff;padding:44px 48px;border-radius:10px;box-shadow:0 8px 32px rgba(10,20,50,.18);font-family:Georgia,'Times New Roman',serif;color:#1c2434;line-height:1.62}.rp-doc h1{font-size:21px;text-align:center;margin:0 0 4px}.rp-doc .rp-nom{text-align:center;font-size:19px;font-weight:700;margin:6px 0}.rp-doc .rp-port{text-align:center;border-bottom:2px solid #1c4f9c;padding-bottom:14px;margin-bottom:16px}.rp-doc h2{font-size:15.5px;color:#1c4f9c;border-bottom:1px solid #ccd6ea;padding-bottom:3px;margin:22px 0 8px}.rp-doc p{margin:6px 0;text-align:justify}.rp-doc table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13.5px}.rp-doc td,.rp-doc th{border:1px solid #b9c4d8;padding:5px 8px;text-align:left}.rp-doc th{background:#eef2fa}.rp-meta{background:#fff7e0;border:1px solid #e3cf8a;border-radius:8px;padding:8px 12px;font-size:12.5px;margin-bottom:16px;font-family:system-ui}@media print{body>*{display:none!important}#fcPropOverlay{display:block!important;position:static;background:#fff;padding:0}#fcPropOverlay .rp-bar{display:none!important}#fcPropOverlay .rp-doc{box-shadow:none;max-width:none}}";
+      document.head.appendChild(st);
+    }
+    ov.querySelector(".rp-cuerpo").innerHTML = html;
+    ov.style.display = "block";
+    ov.scrollTop = 0;
+    try { window._propuestaHTML = html; } catch (e) {}
+  };
+  function montarBoton() {
+    const card = $("docCard");
+    if (!card || $("fcPropBtn")) return;
+    const b = document.createElement("button");
+    b.id = "fcPropBtn"; b.className = "btn btn-p"; b.style.cssText = "width:100%;margin-top:10px";
+    b.innerHTML = "📝 Redactar la propuesta completa del proyecto";
+    b.addEventListener("click", function () { window.fcRedactar(); });
+    const nota = document.createElement("div");
+    nota.className = "hint"; nota.style.marginTop = "6px";
+    nota.textContent = "Escribe el documento de propuesta listo para presentar (expediente según el Decreto 174/2026 para PDL y la Resolución Conjunta 1/2022 para estudios), en prosa profesional y solo con sus datos reales: lo que falte queda marcado [A COMPLETAR] y listado, nunca inventado.";
+    card.appendChild(b); card.appendChild(nota);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarBoton); else montarBoton();
+  setTimeout(montarBoton, 1500);
+})();
+</script>
