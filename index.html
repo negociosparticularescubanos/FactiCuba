@@ -4279,9 +4279,9 @@ try {
       + (cs.length ? cs.map(function (c) { return "<div style='border-top:1px solid #d8dee9;padding:6px 2px'><b>" + esc(c.norma) + "</b> — " + esc(c.titulo) + "<div class='hint'>Detectada el " + esc(c.fecha) + " · Fuente: " + (c.url ? "<a href='" + esc(c.url) + "' target='_blank' rel='noopener'>" + esc(c.fuente) + "</a>" : esc(c.fuente)) + " · <b>Sin verificar</b>: es una candidata; ningún parámetro cambia hasta confirmarla.</div></div>"; }).join("") : "<div class='hint'>Sin normas nuevas detectadas en las fuentes oficiales en la última revisión.</div>")
       + "</div>";
   }
-  async function estudiar() {
+  async function estudiar(forzar) {
     const v = leer();
-    if (v.ultima && Date.now() - v.ultima < 6 * 3600 * 1000) { render(); return; }
+    if (!forzar && v.ultima && Date.now() - v.ultima < 6 * 3600 * 1000) { render(); return; }
     if (typeof fetchTexto !== "function" || typeof URL_ESPEJO_BUSCAR === "undefined") { render(); return; }
     const ya = conocidas();
     const prev = v.candidatos || [];
@@ -4309,7 +4309,12 @@ try {
     v.candidatos = nuevas.concat(prev).slice(0, 12);
     guardar(v);
     render();
+    if (nuevas.length && typeof fcApi === "function" && typeof checkSession === "function" && checkSession()) {
+      try { const pv = fcApi("conocimiento_add", { origen: "vigia", entradas: nuevas.map(function (c) { return { fecha: c.fecha, tipo: "norma", titulo: c.titulo, resumen: "", fuente: c.fuente, fuenteUrl: c.url, aplica: "", estado: "candidata" }; }) }); if (pv && pv.catch) pv.catch(function () {}); } catch (e) {}
+      if (typeof window.fcLogAgente === "function") window.fcLogAgente("Vigía", "normas_detectadas", nuevas.length + " candidata(s) enviadas a la hoja", "ok");
+    }
   }
+  window.fcVigiaEstudiar = estudiar;
   function arrancar() { render(); estudiar(); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(arrancar, 3500); });
   else setTimeout(arrancar, 3500);
@@ -4317,3 +4322,168 @@ try {
   setTimeout(render, 13000);
 })();
 </script>
+
+<script>
+/* ===== CONSOLA DE AGENTES AUTÓNOMOS (fcConsola) =====
+   Sistema multi-agente con Function Calling, RAG y sincronización
+   con la base de datos en Google Sheets («FactiCuba DB» v4):
+   - El Orquestador llama a las funciones de la app (tasas, demanda,
+     respaldo web, precios, autollenado, vigía, redactor) en cadena,
+     muestra cada llamada y deja traza en la hoja Agentes_Log.
+   - RAG sin IA de pago: recupera de la base de conocimiento (la del
+     repo + la de la hoja, ya fusionadas) los pasajes con su fuente
+     citada; nada se inventa y lo elegido puede ir a la propuesta.
+   - La hoja manda: parámetros y conocimiento se sincronizan desde
+     Google Sheets al abrir (con sesión iniciada). */
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function esc(x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); }
+  function norm(x) { return (typeof normSinTilde === "function") ? normSinTilde(String(x || "")) : String(x || "").toLowerCase(); }
+  function sesion() { try { return typeof checkSession === "function" && checkSession(); } catch (e) { return false; } }
+  window.fcLogAgente = function (agente, accion, detalle, resultado) {
+    if (!sesion() || typeof fcApi !== "function") return;
+    try { const pl = fcApi("agente_log_add", { agente: agente, accion: accion, detalle: detalle || "", resultado: resultado || "ok", origen: "app" }); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
+  };
+
+  /* ---------- sincronización con la hoja (la BD en Sheets manda) ---------- */
+  window.fcSyncNube = async function () {
+    const linea = $("syncLinea");
+    if (!sesion() || typeof fcApi !== "function") { if (linea) linea.innerHTML = "☁️ <b>Base en Google Sheets:</b> inicia sesión para sincronizar el conocimiento, los parámetros y el registro de agentes."; return null; }
+    try {
+      const j = await fcApi("conocimiento_list", {});
+      const c = window._fcConocimiento || (window._fcConocimiento = { entradas: [], parametros: {} });
+      if (j && j.ok) {
+        const claves = {}; (c.entradas || []).forEach(function (e) { claves[String(e.titulo || "").toLowerCase().replace(/\s+/g, " ")] = 1; });
+        let nube = 0, cand = 0;
+        (j.entradas || []).forEach(function (e) { const k = String(e.titulo || "").toLowerCase().replace(/\s+/g, " "); if (e.estado === "candidata") cand++; if (!claves[k]) { c.entradas.push(e); claves[k] = 1; nube++; } });
+        if (!(j.entradas || []).length && (c.entradas || []).length) {
+          try { await fcApi("conocimiento_add", { origen: "semilla", entradas: c.entradas.map(function (e) { return { fecha: e.fecha, tipo: e.tipo, titulo: e.titulo, resumen: e.resumen, fuente: e.fuente, fuenteUrl: e.fuenteUrl, aplica: e.aplica, estado: "verificada" }; }) }); } catch (e) {}
+        }
+        window._fcSync = { nube: nube, candidatas: cand, total: (j.entradas || []).length };
+        if (linea) linea.innerHTML = "☁️ <b>Base en Google Sheets sincronizada:</b> " + (j.entradas || []).length + " entrada(s) en la hoja" + (cand ? " · <b>" + cand + " candidata(s) por confirmar</b>" : "") + " · el conocimiento vive en «FactiCuba DB», no en este equipo.";
+      }
+      const jp = await fcApi("parametros_get", {});
+      if (jp && jp.ok && jp.parametros) { const c2 = window._fcConocimiento || (window._fcConocimiento = { entradas: [], parametros: {} }); c2.parametros = Object.assign({}, c2.parametros || {}, jp.parametros); window._fcParametrosNube = jp.parametros; }
+      return window._fcSync || null;
+    } catch (e) { if (linea) linea.innerHTML = "☁️ Sin conexión con la hoja ahora mismo: la app sigue con su base local y sincroniza al volver la conexión."; return null; }
+  };
+
+  /* ---------- RAG: recuperación con fuentes citadas ---------- */
+  const STOP = { "de": 1, "la": 1, "el": 1, "en": 1, "y": 1, "que": 1, "los": 1, "las": 1, "un": 1, "una": 1, "para": 1, "con": 1, "del": 1, "se": 1, "su": 1, "al": 1, "es": 1, "por": 1, "como": 1, "cual": 1, "cuanto": 1, "cuando": 1, "donde": 1 };
+  function corpus() {
+    const out = [];
+    const c = window._fcConocimiento;
+    if (c && c.entradas) c.entradas.forEach(function (e) { out.push({ titulo: e.titulo || "", texto: (e.resumen || "") + " " + (e.aplica || ""), fuente: e.fuente || "", url: e.fuenteUrl || "", estado: e.estado || "verificada" }); });
+    try { const v = JSON.parse(localStorage.getItem("facticuba_vigia_v1") || "{}"); (v.candidatos || []).forEach(function (x) { out.push({ titulo: x.titulo || x.norma || "", texto: "Norma detectada por el Vigía, pendiente de verificación.", fuente: x.fuente || "Vigía", url: x.url || "", estado: "candidata" }); }); } catch (e) {}
+    return out;
+  }
+  window.fcRAG = function (q) {
+    const nq = norm(q); if (!nq) return [];
+    const toks = nq.split(/[^a-z0-9%]+/).filter(function (t) { return t.length > 2 && !STOP[t]; });
+    return corpus().map(function (d) {
+      const nt = norm(d.titulo), nx = norm(d.texto);
+      let sc = 0;
+      toks.forEach(function (t) { if (nt.indexOf(t) >= 0) sc += 3; if (nx.indexOf(t) >= 0) sc += 1.5; });
+      if (toks.length > 1 && nt.indexOf(toks.join(" ")) >= 0) sc += 4;
+      return { d: d, sc: sc };
+    }).filter(function (r) { return r.sc > 0; }).sort(function (a, b) { return b.sc - a.sc; }).slice(0, 4).map(function (r) { return r.d; });
+  };
+  window._ragNotas = window._ragNotas || [];
+  function ragConsultar() {
+    const q = ($("ragQ") && $("ragQ").value || "").trim(), box = $("ragBox");
+    if (!box) return;
+    if (!q) { box.innerHTML = "<span class='hint'>Escribe qué quieres consultar (ej.: «licencia ambiental», «fideicomiso», «evaluación de un PDL»).</span>"; return; }
+    const res = window.fcRAG(q);
+    if (!res.length) { box.innerHTML = "<span class='hint'>La base no trae nada claro sobre eso: queda la búsqueda web de la app o preguntarle a Slipknot en el chat. No se inventa nada.</span>"; return; }
+    box.innerHTML = res.map(function (d, i) {
+      return "<div style='border-top:1px solid #d8dee9;padding:7px 2px'><b>" + esc(d.titulo) + "</b> " + (d.estado === "candidata" ? "<span class='hint'>(candidata, sin verificar)</span>" : "") + "<div>" + esc(String(d.texto || "").slice(0, 260)) + "</div><div class='hint'>Fuente: " + (d.url ? "<a href='" + esc(d.url) + "' target='_blank' rel='noopener'>" + esc(d.fuente) + "</a>" : esc(d.fuente)) + " · <button type='button' class='btn btn-d' data-rag='" + i + "'>➕ Añadir a la propuesta</button></div></div>";
+    }).join("");
+    box.querySelectorAll("[data-rag]").forEach(function (b) { b.addEventListener("click", function () { const d = res[Number(b.getAttribute("data-rag"))]; window._ragNotas.push({ titulo: d.titulo, texto: d.texto, fuente: d.fuente }); b.textContent = "✔ En la propuesta (" + window._ragNotas.length + ")"; b.disabled = true; }); });
+  }
+
+  /* ---------- Orquestador multi-agente (Function Calling) ---------- */
+  const TOOLS = {
+    agente: { nombre: "🤖 Agente de autollenado (tasas + demanda + respaldo web + precios)", run: function () { return window.fcAgenteAuto(); } },
+    vigia: { nombre: "🔭 Vigía de normas nuevas", run: function () { return window.fcVigiaEstudiar(true); } },
+    tasas: { nombre: "💱 Sincronizar tasas (elTOQUE/BCC/CUPET)", run: function () { return sincronizarTasas(true); } },
+    redactar: { nombre: "📝 Redactar la propuesta completa", run: function () { return window.fcRedactar(); } }
+  };
+  async function cadena(pasos, titulo) {
+    const box = $("consolaBox"); if (!box) return;
+    box.innerHTML = "<b>" + esc(titulo) + "</b>" + pasos.map(function (p, i) { return "<div id='cs" + i + "'>⏳ " + esc(TOOLS[p].nombre) + "</div>"; }).join("");
+    window.fcLogAgente("Orquestador", "cadena_inicio", titulo + ": " + pasos.join(" → "), "ok");
+    for (let i = 0; i < pasos.length; i++) {
+      const el = $("cs" + i);
+      try { await TOOLS[pasos[i]].run(); if (el) el.innerHTML = "✔ " + esc(TOOLS[pasos[i]].nombre); window.fcLogAgente("Orquestador", "herramienta_" + pasos[i], TOOLS[pasos[i]].nombre, "ok"); }
+      catch (e) { if (el) el.innerHTML = "⚠ " + esc(TOOLS[pasos[i]].nombre) + " — no se pudo completar (la cadena sigue)"; window.fcLogAgente("Orquestador", "herramienta_" + pasos[i], String(e && e.message || e).slice(0, 120), "error"); }
+    }
+    await autodatosNube();
+    const fin = document.createElement("div"); fin.innerHTML = "<b>Cadena terminada.</b> Cada paso quedó registrado en la hoja «Agentes_Log» de FactiCuba DB."; box.appendChild(fin);
+    window.fcLogAgente("Orquestador", "cadena_fin", titulo, "ok");
+    pintarActividad();
+  }
+  async function autodatosNube() {
+    if (!sesion() || typeof fcApi !== "function") return;
+    try {
+      const prov = ($("provSel") && $("provSel").selectedOptions && $("provSel").selectedOptions[0] ? $("provSel").selectedOptions[0].textContent : ""), mun = ($("muniSel") && $("muniSel").selectedOptions && $("muniSel").selectedOptions[0] ? $("muniSel").selectedOptions[0].textContent : ""), sec = ($("sectorSel") && $("sectorSel").value) || "";
+      const sm = Number(($("salMedio") && $("salMedio").value) || 0);
+      if (prov && mun && sm > 0) await fcApi("autodatos_set", { items: [{ provincia: prov, municipio: mun, sector: sec, campo: "salMedio", valor: sm, fuente: "Consola de agentes (app)" }] });
+    } catch (e) {}
+  }
+  window.fcConsolaPreparar = function () { return cadena(["agente", "vigia"], "🚀 Preparar el estudio — el Orquestador llama a los agentes"); };
+
+  /* ---------- actividad: la pizarra compartida ---------- */
+  async function pintarActividad() {
+    const box = $("actividadBox"); if (!box) return;
+    if (!sesion()) { box.innerHTML = "<span class='hint'>Inicia sesión para ver la actividad de los agentes en la hoja.</span>"; return; }
+    try {
+      const jl = await fcApi("agente_log_list", { limit: 8 });
+      const je = await fcApi("eventos_list", { limit: 5 });
+      let h = "";
+      if (jl && jl.ok && jl.logs.length) h += jl.logs.map(function (l) { return "<div>· <b>" + esc(l.agente) + "</b> — " + esc(l.accion) + " <span class='hint'>" + esc(String(l.fecha || "").slice(0, 16).replace("T", " ")) + " · " + esc(l.resultado) + (l.detalle ? " · " + esc(l.detalle) : "") + "</span></div>"; }).join("");
+      if (je && je.ok && je.eventos.length) h += "<div style='margin-top:4px'><b>Flujos recientes:</b>" + je.eventos.map(function (e) { return "<div>· " + esc(e.tipo) + " <span class='hint'>" + esc(String(e.fecha || "").slice(0, 16).replace("T", " ")) + " · " + esc(e.detalle) + "</span></div>"; }).join("") + "</div>";
+      box.innerHTML = h || "<span class='hint'>Todavía sin actividad registrada en la hoja.</span>";
+    } catch (e) { box.innerHTML = "<span class='hint'>Sin conexión con la hoja en este momento.</span>"; }
+  }
+  window.fcPintarActividad = pintarActividad;
+
+  /* ---------- anexo RAG en la propuesta ---------- */
+  function anexarRAG() {
+    if (!window._ragNotas.length) return;
+    const ov = $("fcPropOverlay"); if (!ov || ov.style.display === "none") return;
+    const cuerpo = ov.querySelector(".rp-cuerpo"); if (!cuerpo || $("ragAnexo")) return;
+    const div = document.createElement("div"); div.className = "rp-doc"; div.id = "ragAnexo"; div.style.marginTop = "14px";
+    div.innerHTML = "<h2>ANEXO — Notas de consulta con fuentes (agente RAG)</h2>" + window._ragNotas.map(function (n) { return "<p><b>" + esc(n.titulo) + ".</b> " + esc(n.texto) + " <i>(Fuente: " + esc(n.fuente) + ")</i></p>"; }).join("");
+    cuerpo.appendChild(div);
+  }
+  if (typeof window.fcRedactar === "function") { const orig = window.fcRedactar; window.fcRedactar = function () { const r = orig.apply(this, arguments); setTimeout(anexarRAG, 500); return r; }; }
+  document.addEventListener("click", function (e) { if (e.target && e.target.id === "fcPropBtn") setTimeout(anexarRAG, 800); }, true);
+
+  /* ---------- la tarjeta ---------- */
+  function montar() {
+    if ($("consolaCard")) return;
+    const ref = $("agenteCard") || $("aprendCard");
+    const card = document.createElement("section"); card.className = "card"; card.id = "consolaCard";
+    card.innerHTML = "<h3 style='margin-top:0'>🤖 Consola de agentes autónomos</h3>"
+      + "<p class='hint'>Sistema <b>multi-agente</b> con <b>llamada a funciones</b>: el Orquestador ejecuta las herramientas de la app en cadena y cada paso queda registrado en tu base de datos de Google Sheets. El <b>agente RAG</b> consulta la base de conocimiento y responde solo con fuentes citadas. Todo gratis, en tus cuentas, sin depender de nadie.</p>"
+      + "<div id='syncLinea' class='hint' style='margin:6px 0'>☁️ Sincronizando con «FactiCuba DB»…</div>"
+      + "<div style='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0'><button type='button' class='btn btn-p' id='btnPreparar'>🚀 Preparar el estudio (multi-agente)</button><button type='button' class='btn btn-d' id='btnNormas'>🔭 Revisar normas nuevas</button><button type='button' class='btn btn-d' id='btnSync'>☁️ Sincronizar con la hoja</button></div>"
+      + "<div id='consolaBox'></div>"
+      + "<div style='border-top:2px solid #d8dee9;margin-top:10px;padding-top:8px'><b>📚 Agente RAG — consulta la base de conocimiento</b><div style='display:flex;gap:8px;margin:6px 0'><input id='ragQ' type='text' placeholder='Ej.: licencia ambiental, fideicomiso, evaluación del PDL…' style='flex:1'><button type='button' class='btn btn-p' id='btnRag'>Consultar</button></div><div id='ragBox'></div></div>"
+      + "<div style='border-top:2px solid #d8dee9;margin-top:10px;padding-top:8px'><b>📋 Actividad de los agentes</b> <span class='hint'>la pizarra compartida en la hoja «Agentes_Log»</span> <button type='button' class='btn btn-d' id='btnActividad'>↻ Actualizar</button><div id='actividadBox' style='margin-top:6px'></div></div>";
+    if (ref && ref.parentNode) ref.parentNode.insertBefore(card, ref.nextSibling); else document.body.appendChild(card);
+    $("btnPreparar").addEventListener("click", function () { window.fcConsolaPreparar(); });
+    $("btnNormas").addEventListener("click", function () { cadena(["vigia"], "🔭 Revisión de normas — el Vigía estudia las fuentes oficiales"); });
+    $("btnSync").addEventListener("click", async function () { await window.fcSyncNube(); pintarActividad(); });
+    $("btnRag").addEventListener("click", ragConsultar);
+    $("ragQ").addEventListener("keydown", function (e) { if (e.key === "Enter") ragConsultar(); });
+    $("btnActividad").addEventListener("click", pintarActividad);
+    window.fcSyncNube();
+    pintarActividad();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(montar, 3200); });
+  else setTimeout(montar, 3200);
+  setTimeout(montar, 8000);
+})();
+</script>
+
