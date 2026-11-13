@@ -4103,9 +4103,9 @@ try {
       return "<div style='border-top:1px solid var(--line,#d8dee9);padding:7px 2px'><b>" + String(e.titulo || "") + "</b> <span class='hint'>" + String(e.fecha || "") + " · " + String(e.tipo || "") + "</span><div style='font-size:13px'>" + String(e.resumen || "") + "</div><div class='hint'>Fuente: " + (e.fuenteUrl ? "<a href='" + e.fuenteUrl + "' target='_blank' rel='noopener'>" + String(e.fuente || "ver fuente") + "</a>" : String(e.fuente || "—")) + (e.aplica ? " · Se aplica en: " + String(e.aplica) : "") + "</div></div>";
     }).join("");
     card.innerHTML = "<h3>🧠 FactiCuba aprende cada día</h3>"
-      + "<div class='alert info'>Base de conocimiento <b>actualizada el " + String(c.actualizado || "—") + "</b> por el agente de estudio (revisa cada mañana la Gaceta Oficial, el MEP, el MINCEX, el BCC, el MFP/ONAT, el CITMA y la ONEI). Novedades incorporadas: <b>" + c.entradas.length + "</b>. Los parámetros de esta base (comisiones, topes, plazos y mínimos legales) se aplican solos en los cálculos y en los documentos que genera la app.</div>"
+      + "<div class='alert info'>Base de conocimiento <b>actualizada el " + String(c.actualizado || "—") + "</b> por los agentes autónomos de la propia app (el Vigía integrado y el Aprendiz de su cuenta de Google), que revisan la Gaceta Oficial, el MEP, el MINCEX, el BCC, el MFP/ONAT, el CITMA y la ONEI sin depender de nadie más. Novedades incorporadas: <b>" + c.entradas.length + "</b>. Los parámetros de esta base (comisiones, topes, plazos y mínimos legales) se aplican solos en los cálculos y en los documentos que genera la app.</div>"
       + ult
-      + "<div class='hint'>Si una norma cambia, el agente actualiza primero esta base y le avisa a Leonardo; los cambios de código de la app se proponen y se aplican con su aprobación, nunca en silencio.</div>";
+      + "<div class='hint'>Si una norma cambia, primero aparece abajo como candidata detectada por el Vigía («sin verificar») y solo se aplica a los parámetros cuando se confirma; el código de la app no se toca solo.</div>";
   }
   function cargar() {
     try {
@@ -4242,5 +4242,78 @@ try {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montar); else montar();
   setTimeout(montar, 1500);
+})();
+</script>
+
+<script>
+/* ===== VIGÍA AUTÓNOMO (fcVigia) =====
+   Agente que vive DENTRO de la app y trabaja solo, sin depender de
+   Slipknot ni de ningún token externo: cada vez que la app se abre
+   (máximo una revisión cada 6 horas por equipo) consulta el buscador
+   propio de FactiCuba hacia las fuentes oficiales, detecta normas
+   nuevas del tema (Decreto/Resolución/Ley N.º/año con palabras del
+   dominio) y las guarda como CANDIDATAS en la tarjeta de aprendizaje,
+   marcadas «sin verificar». Nunca cambia parámetros ni afirma nada:
+   propone. La verificación la hace Leonardo o Slipknot en el chat. */
+(function () {
+  const LS = "facticuba_vigia_v1";
+  const QUERIES = ["Gaceta Oficial Cuba decreto resolución desarrollo local", "MEP Cuba resolución proyectos de desarrollo local", "Banco Central de Cuba resolución crédito mipymes", "ONAT MFP Cuba resolución tributos mipymes", "CITMA Cuba licencia ambiental resolución", "MINCEX inversión extranjera plan de negocio Cuba"];
+  const CLAVES = /desarrollo local|factibilidad|inversi|mipyme|\bpdl\b|vivienda|ambiental|tribut|onat|crédit|fideicomiso|territorial|licencia/i;
+  const NORMA = /\b(Decreto[- ]Ley|Decreto|Resolución(?:\s+Conjunta)?|Ley|Acuerdo)\s+(?:No\.?\s*)?(\d{1,3})\s*\/\s*(20\d{2})\b/i;
+  function leer() { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; } }
+  function guardar(v) { try { localStorage.setItem(LS, JSON.stringify(v)); } catch (e) {} }
+  function conocidas() {
+    const set = {};
+    const c = window._fcConocimiento;
+    if (c && c.entradas) c.entradas.forEach(function (e) { const m = ((e.titulo || "") + " " + (e.resumen || "")).match(NORMA); if (m) set[(m[1].replace(/\s+/g, " ") + " " + m[2] + "/" + m[3]).toLowerCase()] = 1; });
+    return set;
+  }
+  function esc(x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); }
+  function render() {
+    const card = document.getElementById("aprendCard"); if (!card) return;
+    const v = leer();
+    let box = document.getElementById("vigiaBox");
+    if (!box) { box = document.createElement("div"); box.id = "vigiaBox"; card.appendChild(box); }
+    const cs = v.candidatos || [];
+    box.innerHTML = "<div style='border-top:2px solid #d8dee9;margin-top:10px;padding-top:8px'><b>🔭 Vigía autónomo de la app</b> <span class='hint'>trabaja solo, dentro de la app, cada vez que la abres — no depende de Slipknot ni de tokens. Última revisión: " + (v.ultima ? new Date(v.ultima).toLocaleString("es-CU") : "—") + "</span>"
+      + (cs.length ? cs.map(function (c) { return "<div style='border-top:1px solid #d8dee9;padding:6px 2px'><b>" + esc(c.norma) + "</b> — " + esc(c.titulo) + "<div class='hint'>Detectada el " + esc(c.fecha) + " · Fuente: " + (c.url ? "<a href='" + esc(c.url) + "' target='_blank' rel='noopener'>" + esc(c.fuente) + "</a>" : esc(c.fuente)) + " · <b>Sin verificar</b>: es una candidata; ningún parámetro cambia hasta confirmarla.</div></div>"; }).join("") : "<div class='hint'>Sin normas nuevas detectadas en las fuentes oficiales en la última revisión.</div>")
+      + "</div>";
+  }
+  async function estudiar() {
+    const v = leer();
+    if (v.ultima && Date.now() - v.ultima < 6 * 3600 * 1000) { render(); return; }
+    if (typeof fetchTexto !== "function" || typeof URL_ESPEJO_BUSCAR === "undefined") { render(); return; }
+    const ya = conocidas();
+    const prev = v.candidatos || [];
+    prev.forEach(function (c) { ya[String(c.norma || "").toLowerCase()] = 1; });
+    const dia = Math.floor(Date.now() / 86400000);
+    const qs = [QUERIES[dia % QUERIES.length], QUERIES[(dia + 2) % QUERIES.length], QUERIES[(dia + 4) % QUERIES.length]];
+    const nuevas = [];
+    for (const q of qs) {
+      try {
+        const r = await fetchTexto(URL_ESPEJO_BUSCAR + "?q=" + encodeURIComponent(q), 15000);
+        if (!r || !r.txt) continue;
+        const j = JSON.parse(r.txt);
+        (j.items || []).slice(0, 8).forEach(function (it) {
+          const tx = (it.titulo || "") + " " + (it.extracto || "");
+          const m = tx.match(NORMA);
+          if (!m || !CLAVES.test(tx)) return;
+          const norma = m[1].replace(/\s+/g, " ") + " " + m[2] + "/" + m[3];
+          const k = norma.toLowerCase();
+          if (ya[k]) return; ya[k] = 1;
+          nuevas.push({ norma: norma, titulo: String(it.titulo || "").slice(0, 140), fecha: new Date().toISOString().slice(0, 10), fuente: it.fuente || "web oficial", url: it.url || "" });
+        });
+      } catch (e) {}
+    }
+    v.ultima = Date.now();
+    v.candidatos = nuevas.concat(prev).slice(0, 12);
+    guardar(v);
+    render();
+  }
+  function arrancar() { render(); estudiar(); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(arrancar, 3500); });
+  else setTimeout(arrancar, 3500);
+  setTimeout(render, 7000);
+  setTimeout(render, 13000);
 })();
 </script>
