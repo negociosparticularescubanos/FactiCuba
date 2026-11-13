@@ -3,6 +3,15 @@
  "descripcion": "Base de conocimiento viva de FactiCuba. La mantienen los agentes autónomos del propio sistema: el Vigía integrado en la app (estudia las fuentes oficiales cada vez que se abre, sin depender de nadie) y el Aprendiz de Apps Script en la cuenta de Google del negocio (revisión diaria automática). Solo entran novedades con fuente; las detecciones automáticas se marcan «sin verificar» y los parámetros legales solo cambian tras confirmación.",
  "entradas": [
   {
+   "fecha": "2026-11-13",
+   "tipo": "metodologia",
+   "titulo": "Metodología del consultor: prioridades estratégicas y estructura del estudio",
+   "resumen": "Toda evaluación pondera las 6 prioridades del país (divisas o sustitución de importaciones, soberanía alimentaria, transición energética/FRE, encadenamientos productivos locales, impacto social y territorial, sostenibilidad ambiental CITMA). Estructura en 7 capítulos (resumen, mercado, técnico, organizacional-legal-ambiental, económico-financiero, evaluación-riesgos-sensibilidad, conclusiones). Evaluación: VAN>0 con tasa de descuento 10-15 %, TIR superior a la tasa, PRI simple Y descontado, relación B/C y punto de equilibrio; escenarios Pesimista (ventas -20 %, insumos +30 %), Base y Optimista. Fuentes obligatorias: ONEI y EDM, MFP, UNE, INRH, CUPET, ETECSA, proformas de importadoras (CIF + aranceles), Ley 113/ONAT, BCC y banca comercial, DMOTU/ONN/MINSAP/CITMA. Regla de oro: si faltan datos críticos se piden en lista estructurada; nada se inventa sin marcarlo como supuesto explícito.",
+   "fuente": "Metodología aportada por Leonardo (2026-11-13), archivo METODOLOGIA-CONSULTOR.md del proyecto",
+   "fuenteUrl": "",
+   "aplica": "Tarjeta de Prioridades estratégicas, escenarios de sensibilidad y PRI descontado de FactiCuba; estructura de la propuesta redactada"
+  },
+  {
    "aplica": "Redactor de propuestas y tarjeta de Trámites",
    "fecha": "2026-11-13",
    "fuente": "Granma, «Nuevas reglas para impulsar el desarrollo desde lo local», 29-10-2026 (Gaceta Oficial No. 87/2026)",

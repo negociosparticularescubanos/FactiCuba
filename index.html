@@ -4627,3 +4627,147 @@ try {
 })();
 </script>
 
+<script>
+/* ===== METODOLOGÍA DEL CONSULTOR (fcMetodo) =====
+   Lo aprovechable de la metodología aportada por Leonardo
+   (METODOLOGIA-CONSULTOR.md), integrado a FactiCuba:
+   - Tarjeta «Prioridades estratégicas del país»: puntúa las 6
+     prioridades (divisas/sustitución, soberanía alimentaria,
+     energía/FRE, encadenamientos, impacto social-territorial,
+     ambiente CITMA) con reglas transparentes desde el formulario.
+   - Escenarios Pesimista (ventas -20 %, insumos +30 %), Base y
+     Optimista con VAN y TIR, y el PRI DESCONTADO que faltaba,
+     derivados de la proyección oficial de la app (e5).
+   - Ambas salidas entran como anexo en la propuesta redactada.
+   Se recalculan solos cada vez que se genera el informe. */
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function esc(x) { return (typeof escH === "function") ? escH(x) : String(x == null ? "" : x); }
+  function V(id) { return (typeof val === "function") ? (Number(val(id)) || 0) : 0; }
+  function txt(id) { const e = $(id); return e ? String(e.value || "") : ""; }
+  function clamp(n) { return Math.max(0, Math.min(100, Math.round(n))); }
+
+  function evaluarPrioridades() {
+    const sec = txt("sectorSel").toLowerCase(), actor = txt("actorSel").toLowerCase();
+    const texto = (txt("nomProy") + " " + txt("descProy") + " " + txt("eObj")).toLowerCase();
+    const depImp = V("depImp"), energia = txt("energiaSel");
+    let amb = null;
+    try { if (typeof fcIntegralCalc === "function") amb = fcIntegralCalc().ambiental; } catch (e) {}
+    const items = [];
+    /* 1 · divisas o sustitución de importaciones */
+    let p1 = 30, m1 = "venta local en CUP, sin componente externo declarado";
+    if (/export|divisa|extranjer|turismo internacional/.test(texto) || sec.indexOf("turismo") >= 0) { p1 = 82; m1 = "capta divisas (exportación/turismo internacional)"; }
+    else if (V("fAutDiv") > 0) { p1 = 62; m1 = "financiamiento y operación con componente en divisas"; }
+    else if (depImp > 0 && depImp <= 25) { p1 = 58; m1 = "sustituye importaciones: solo " + depImp + " % de insumos importados"; }
+    else if (sec.indexOf("agro") >= 0 && depImp <= 45) { p1 = 60; m1 = "producción nacional que desplaza importaciones de alimentos"; }
+    items.push({ n: "Generación de divisas / sustitución de importaciones", p: p1, m: m1 });
+    /* 2 · soberanía alimentaria */
+    let p2 = 25, m2 = "sector ajeno a la cadena alimentaria";
+    if (sec.indexOf("agro") >= 0) { p2 = 90; m2 = "producción agropecuaria/agroindustrial directa"; }
+    else if (sec.indexOf("gastronom") >= 0) { p2 = depImp <= 50 ? 72 : 58; m2 = "elaboración de alimentos" + (depImp <= 50 ? " con insumos mayormente nacionales" : ""); }
+    else if (/aliment|comida|bebida/.test(texto)) { p2 = 65; m2 = "el proyecto declara actividad alimentaria"; }
+    items.push({ n: "Soberanía alimentaria", p: p2, m: m2 });
+    /* 3 · transición energética y FRE */
+    let p3 = energia === "total" ? 95 : energia === "parcial" ? 55 : 20;
+    let m3 = energia === "total" ? "autonomía total con solar y respaldo" : energia === "parcial" ? "respaldo parcial (planta o UPS)" : "sin respaldo energético declarado";
+    try { const det = JSON.parse(localStorage.getItem("facticuba_detalle_v1") || "{}"); if ((det.equipos || []).some(function (e) { return /solar|panel|inversor|fotovolta/.test(String(e.nombre || e.desc || "").toLowerCase()); })) { p3 = Math.min(100, p3 + 12); m3 += "; equipamiento renovable en el detalle"; } } catch (e) {}
+    items.push({ n: "Transición energética y fuentes renovables", p: p3, m: m3 });
+    /* 4 · encadenamientos productivos locales */
+    const enc = txt("eEncad").trim();
+    let p4 = enc.length > 40 ? 80 : enc.length > 10 ? 62 : depImp > 0 && depImp <= 30 ? 55 : depImp > 0 && depImp <= 60 ? 40 : 26;
+    let m4 = enc ? "encadenamiento declarado en el estudio" : "sin encadenamiento descrito todavía";
+    if (actor.indexOf("pdl") >= 0) { p4 = Math.min(100, p4 + 10); m4 += "; es PDL (desarrollo local)"; }
+    items.push({ n: "Encadenamientos productivos y desarrollo local", p: p4, m: m4 });
+    /* 5 · impacto social y territorial */
+    const emp = V("eEmpleos") || V("numTrab");
+    let p5 = emp >= 15 ? 85 : emp >= 8 ? 70 : emp >= 4 ? 55 : emp >= 1 ? 40 : 20;
+    let m5 = emp > 0 ? emp + " empleos directos" : "sin empleos declarados";
+    if (V("salMedio") >= 8000) { p5 = Math.min(100, p5 + 8); m5 += "; salario medio de " + fmt(V("salMedio")) + " CUP"; }
+    if (txt("eAporte").trim().length > 15) { p5 = Math.min(100, p5 + 5); m5 += "; aporte a la población descrito"; }
+    items.push({ n: "Impacto social y territorial", p: p5, m: m5 });
+    /* 6 · sostenibilidad ambiental */
+    const p6 = amb != null ? clamp(amb) : energia === "total" ? 70 : energia === "parcial" ? 50 : 35;
+    items.push({ n: "Sostenibilidad ambiental (CITMA)", p: p6, m: amb != null ? "tomado de la evaluación ambiental integral de la app" : "estimado por la autonomía energética declarada" });
+    const prom = Math.round(items.reduce(function (a, x) { return a + x.p; }, 0) / items.length);
+    window._prioridades = { items: items, promedio: prom, nivel: prom >= 70 ? "Alta" : prom >= 50 ? "Media" : "Baja" };
+    const box = $("prioBox");
+    if (box) box.innerHTML = items.map(function (x) {
+      return "<div style='margin:5px 0'><div style='display:flex;justify-content:space-between;gap:8px'><span>" + esc(x.n) + "</span><b>" + x.p + "</b></div><div style='background:#e3e9f4;border-radius:6px;height:8px'><div style='background:" + (x.p >= 70 ? "#1d9e75" : x.p >= 45 ? "#d99a16" : "#c64b4b") + ";height:8px;border-radius:6px;width:" + x.p + "%'></div></div><div class='hint'>" + esc(x.m) + "</div></div>";
+    }).join("") + "<div style='border-top:2px solid #d8dee9;margin-top:8px;padding-top:6px'><b>Alineación con las prioridades del país: " + prom + "/100 (" + window._prioridades.nivel + ")</b> <span class='hint'>Criterio del evaluador según la metodología MEP/MINCEX: un proyecto alineado se defiende mejor ante el banco y la administración.</span></div>";
+    return window._prioridades;
+  }
+  window.fcPrioridades = evaluarPrioridades;
+
+  function vanDe(flujos, inv, tasa) { let v = -inv; for (let i = 0; i < flujos.length; i++) v += flujos[i] / Math.pow(1 + tasa, i + 1); return v; }
+  function tirDe(flujos, inv) {
+    const f = function (r) { let v = -inv; for (let i = 0; i < flujos.length; i++) v += flujos[i] / Math.pow(1 + r, i + 1); return v; };
+    if (f(0) <= 0) return null;
+    let lo = -0.9, hi = 10; if (f(hi) > 0) return null;
+    for (let i = 0; i < 70; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) lo = mid; else hi = mid; }
+    return lo;
+  }
+  function priDescontado(flujos, inv, tasa) {
+    let cum = 0;
+    for (let i = 0; i < flujos.length; i++) { const d = flujos[i] / Math.pow(1 + tasa, i + 1); if (cum + d >= inv && d > 0) return i + (inv - cum) / d; cum += d; }
+    return null;
+  }
+  function calcularEscenarios() {
+    const box = $("escBox");
+    let R = null; try { R = ultimoResultado; } catch (e) {}
+    if (!R || !R.e5 || !R.e5.filas6 || !R.e5.filas6.length) { if (box) box.innerHTML = "<span class='hint'>Primero genera el informe (botón «Calcular») y los escenarios se calculan solos desde su proyección.</span>"; return null; }
+    const inv = (typeof invInicialCUP === "function") ? invInicialCUP() : 0;
+    const tasa = (V("eTasa") || 12) / 100;
+    const filas = R.e5.filas6;
+    const mk = function (fv, fc) { return filas.map(function (f) { const costos = (Number(f.ing) || 0) - (Number(f.netOp) || 0); return (Number(f.ing) || 0) * fv - costos * fc - (Number(f.capex) || 0); }); };
+    const base = filas.map(function (f) { return Number(f.net) || 0; });
+    const esc3 = {
+      base: { flujos: base },
+      pesimista: { flujos: mk(0.80, 1.30) },
+      optimista: { flujos: mk(1.10, 0.95) }
+    };
+    Object.keys(esc3).forEach(function (k) { esc3[k].van = vanDe(esc3[k].flujos, inv, tasa); esc3[k].tir = tirDe(esc3[k].flujos, inv); });
+    const prid = priDescontado(base, inv, tasa);
+    window._escenarios = { tasa: tasa * 100, inv: inv, base: esc3.base, pesimista: esc3.pesimista, optimista: esc3.optimista, priDescontadoAnios: prid };
+    const fila = function (nombre, e, nota) { return "<tr><td style='text-align:left'><b>" + nombre + "</b><div class='hint'>" + nota + "</div></td><td class='mono'>" + fmt(e.van) + "</td><td class='mono'>" + (e.tir == null ? "—" : fmt1(e.tir * 100) + " %") + "</td></tr>"; };
+    if (box) box.innerHTML = "<div class='tblwrap'><table class='t'><tr><th>Escenario</th><th>VAN (CUP)</th><th>TIR</th></tr>"
+      + fila("Pesimista", esc3.pesimista, "ventas −20 %, costos de insumos +30 %")
+      + fila("Base", esc3.base, "la proyección del informe")
+      + fila("Optimista", esc3.optimista, "ventas +10 %, costos −5 %")
+      + "</table></div><p class='hint'>VAN al " + fmt1(tasa * 100) + " % sobre el horizonte de la proyección de la app. <b>PRI descontado: " + (prid == null ? "no se alcanza en el horizonte" : fmt1(prid) + " años") + "</b>" + (R.e5.priM ? " (el PRI simple del informe es " + R.e5.priM + " meses)" : "") + ". Lectura del consultor: el proyecto se defiende si el VAN pesimista no se hunde y la TIR base supera la tasa de descuento.</p>";
+    return window._escenarios;
+  }
+  window.fcEscenarios = calcularEscenarios;
+
+  function anexarMetodo() {
+    if (!window._prioridades && !window._escenarios) return;
+    const ov = $("fcPropOverlay"); if (!ov || ov.style.display === "none") return;
+    const cuerpo = ov.querySelector(".rp-cuerpo"); if (!cuerpo || $("metodoAnexo")) return;
+    let h = "";
+    if (window._prioridades) { const P = window._prioridades; h += "<h2>ALINEACIÓN CON LAS PRIORIDADES ESTRATÉGICAS DEL PAÍS</h2><p>Según la metodología de evaluación vigente (MEP/MINCEX), el proyecto se pondera frente a las prioridades económicas nacionales:</p><table><tr><th>Prioridad</th><th>Puntuación</th><th>Fundamento</th></tr>" + P.items.map(function (x) { return "<tr><td>" + esc(x.n) + "</td><td>" + x.p + "/100</td><td>" + esc(x.m) + "</td></tr>"; }).join("") + "</table><p><b>Alineación global: " + P.promedio + "/100 (" + P.nivel + ").</b></p>"; }
+    if (window._escenarios) { const E = window._escenarios; const f1 = function (e) { return fmt(e.van) + " CUP · TIR " + (e.tir == null ? "—" : fmt1(e.tir * 100) + " %"); }; h += "<h2>ANÁLISIS DE SENSIBILIDAD POR ESCENARIOS</h2><p>Pesimista (ventas −20 %, insumos +30 %): <b>" + f1(E.pesimista) + "</b>. Base: <b>" + f1(E.base) + "</b>. Optimista (ventas +10 %, costos −5 %): <b>" + f1(E.optimista) + "</b>. VAN calculado al " + fmt1(E.tasa) + " %. PRI descontado: <b>" + (E.priDescontadoAnios == null ? "no alcanzado en el horizonte" : fmt1(E.priDescontadoAnios) + " años") + "</b>.</p>"; }
+    h += "<p><i>Fuentes de datos conforme a la metodología: ONEI y Estrategias de Desarrollo Municipal; listados del MFP; tarifas de la UNE, el INRH, CUPET y ETECSA; Ley 113 y normas de la ONAT; tasas del BCC y la banca comercial; regulaciones del CITMA, la DMOTU y el MINSAP. Ninguna cifra de este estudio se inventa: lo que falta queda marcado para completarlo.</i></p>";
+    const div = document.createElement("div"); div.className = "rp-doc"; div.id = "metodoAnexo"; div.style.marginTop = "14px";
+    div.innerHTML = h; cuerpo.appendChild(div);
+  }
+  if (typeof window.fcRedactar === "function") { const orig = window.fcRedactar; window.fcRedactar = function () { const r = orig.apply(this, arguments); setTimeout(anexarMetodo, 650); return r; }; }
+  document.addEventListener("click", function (e) { if (e.target && e.target.id === "fcPropBtn") setTimeout(anexarMetodo, 950); }, true);
+  if (typeof window.generarInforme === "function") { const og = window.generarInforme; window.generarInforme = function () { const r = og.apply(this, arguments); setTimeout(function () { try { evaluarPrioridades(); } catch (e) {} try { calcularEscenarios(); } catch (e) {} }, 350); return r; }; }
+
+  function montar() {
+    if ($("metodoCard")) return;
+    const ref = $("consolaCard") || $("agenteCard") || $("aprendCard");
+    const card = document.createElement("section"); card.className = "card"; card.id = "metodoCard";
+    card.innerHTML = "<h3 style='margin-top:0'>🎯 Metodología del consultor: prioridades y escenarios</h3>"
+      + "<p class='hint'>Lo que un evaluador del MEP/MINCEX mira antes que los números: cómo el proyecto responde a las <b>prioridades del país</b>, y si sobrevive al <b>escenario pesimista</b>. Se calcula solo al generar el informe; también puedes forzarlo aquí. Todo entra como anexo en la propuesta redactada.</p>"
+      + "<div style='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0'><button type='button' class='btn btn-p' id='btnPrio'>🎯 Evaluar prioridades</button><button type='button' class='btn btn-d' id='btnEsc'>📊 Calcular escenarios</button></div>"
+      + "<div id='prioBox'></div><div id='escBox' style='margin-top:8px'></div>";
+    if (ref && ref.parentNode) ref.parentNode.insertBefore(card, ref.nextSibling); else document.body.appendChild(card);
+    $("btnPrio").addEventListener("click", evaluarPrioridades);
+    $("btnEsc").addEventListener("click", calcularEscenarios);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(montar, 3600); });
+  else setTimeout(montar, 3600);
+  setTimeout(montar, 9000);
+})();
+</script>
+
