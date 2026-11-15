@@ -6045,3 +6045,72 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
   document.addEventListener("DOMContentLoaded", instalar);
 })();
 </script>
+<script>
+/* ============ fcHub: el Hub Central en FactiCuba (2026-11-15) ============
+   Al generar el informe, una tarjeta trae lo que el Hub Central ya sabe
+   del territorio y del actor de ESTE proyecto — carencias del municipio,
+   normas del actor y últimas gacetas — a través del puente del Hub.
+   Es contexto con fuentes, separado de los números del proyecto. Si el
+   Hub no tiene datos o no responde, la tarjeta simplemente no aparece. */
+(function () {
+  "use strict";
+  var URL_HUB = "https://script.google.com/macros/s/AKfycbzBrhyvGu3yBC4RfVCqFHQXKmxzqj56JosS7uDNR9CCAtVOmiCmtx07i0zmrSZyvvvG/exec";
+  function $(i) { return document.getElementById(i); }
+  function esc(s) { try { return escH(String(s)); } catch (e) { var d = document.createElement("div"); d.textContent = String(s); return d.innerHTML; } }
+  function R() { try { return (typeof ultimoResultado !== "undefined" && ultimoResultado) || null; } catch (e) { return null; } }
+  function get(qs) { return fetch(URL_HUB + qs).then(function (r) { return r.json(); }).catch(function () { return null; }); }
+  var ACTOR_HUB = { mipyme_priv: "mipyme", mipyme_est: "mipyme", cna: "cna", tcp: "tcp", pdl: "tcp", estatal: "estatal" };
+  function pintar() {
+    var r = R(); if (!r) return;
+    var viejo = $("fcHubBox"); if (viejo) viejo.remove();
+    var anchor = $("fcAgenteBox") || $("fcEvalPdlBox") || $("planMejoraBox");
+    if (!anchor || !anchor.parentNode) return;
+    var d = document.createElement("div");
+    d.id = "fcHubBox"; d.className = "card no-print";
+    d.style.cssText = "border-left:5px solid #0ea5e9";
+    d.innerHTML = "<h3 style='margin-top:0'>🏛️ Hub Central — lo que ya se sabe de este territorio y este actor</h3><div id='fcHubBody'><p class='hint'>Consultando el Hub Central…</p></div>";
+    anchor.parentNode.insertBefore(d, anchor.nextSibling);
+    var mun = ($("muniSel") && $("muniSel").value) || "";
+    var prov = ($("provSel") && $("provSel").value) || "";
+    var tipo = ACTOR_HUB[r.actor] || "";
+    Promise.all([
+      get("?accion=carencias&municipio=" + encodeURIComponent(mun) + "&provincia=" + encodeURIComponent(prov)),
+      tipo ? get("?accion=actores&tipo=" + encodeURIComponent(tipo)) : Promise.resolve(null),
+      get("?accion=gacetas")
+    ]).then(function (res) {
+      var body = $("fcHubBody"); if (!body) return;
+      var car = (res[0] && res[0].carencias) || [];
+      var act = (res[1] && res[1].actores) || [];
+      var gac = (res[2] && res[2].gacetas) || [];
+      if (!car.length && !act.length && !gac.length) {
+        var box = $("fcHubBox"); if (box) box.remove();
+        return;
+      }
+      var h = "";
+      if (car.length) h += "<p style='margin:6px 0'><b>Carencias de " + esc(mun) + "</b> (prioridad 1 = alimentos, primero):</p>" + car.slice(0, 5).map(function (c) {
+        return "<p style='margin:4px 0'>• <b>" + esc(c.categoria || "") + ":</b> " + esc(c.resumen_necesidad || "") + (c.fuente_url ? " <a href='" + esc(c.fuente_url) + "' target='_blank' rel='noopener'>fuente</a>" : "") + "</p>";
+      }).join("");
+      if (act.length) h += "<p style='margin:10px 0 6px'><b>Normas recientes para este actor:</b></p>" + act.slice(0, 4).map(function (a) {
+        return "<p style='margin:4px 0'>• <b>" + esc(a.titulo_norma || "") + "</b> (" + esc(a.tema || "") + ") — " + esc(a.resumen_ejecutivo || "") + "</p>";
+      }).join("");
+      if (gac.length) h += "<p style='margin:10px 0 6px'><b>Últimas gacetas:</b> " + gac.slice(0, 3).map(function (g) { return "N.º " + esc(g.numero_gaceta || "") + " (" + esc(g.fecha_publicacion || "") + ")"; }).join(" · ") + "</p>";
+      h += "<p class='hint'>Contexto del Hub Central de Inteligencia Territorial — VERIFICAR antes de presentarlo; no forma parte de los cálculos del estudio.</p>";
+      body.innerHTML = h;
+    });
+  }
+  function instalar() {
+    if (window._fcHubOn) return;
+    if (typeof window.generarInforme !== "function") return;
+    window._fcHubOn = true;
+    var base = window.generarInforme;
+    window.generarInforme = function () {
+      var r = base.apply(this, arguments);
+      setTimeout(function () { try { pintar(); } catch (e) {} }, 950);
+      return r;
+    };
+  }
+  instalar();
+  document.addEventListener("DOMContentLoaded", instalar);
+  window.fcHub = { pintar: pintar };
+})();
+</script>
