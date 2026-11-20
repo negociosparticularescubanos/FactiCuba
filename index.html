@@ -5376,7 +5376,8 @@ if (typeof baseGen2 === "function" && !window._fcRefInfOn) {
    «Ventas de referencia de negocios parecidos (nivel): entre X y Y CUP
    al día; valor del medio Z CUP/día (≈ M CUP al mes, 26 días). Costo
    típico del sector: P %.» — de ahí se parsean las cifras. */
-var URL_KB_REF = "https://script.google.com/macros/s/AKfycbzDmBLwgQj0Mx-YKryieWePKs7jFO29FX5D1Mn3KLj9ICnkSUsJwztwtNzUHj6e_5PJ6g/exec";
+var SUPA_URL_REF = "https://uczlkdzvzbqgzzlhcmro.supabase.co";
+var SUPA_ANON_REF = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjemxrZHp2emJxZ3p6bGhjbXJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMzU2ODAsImV4cCI6MjExMDcxMTY4MH0.3xwFjVbL-Usa9hohxU0u__alXH8ZsdsJhH5CWllkH1M";
 function numeroEn(txt, re){ var m = String(txt || "").match(re); return m ? parseFloat(m[1].replace(/\s/g, "")) : 0; }
 function refDesdeBase(r, sec, mun){
   var dato = String(r.dato || "");
@@ -5396,10 +5397,10 @@ function refDesdeBase(r, sec, mun){
 }
 function consultarBase(sec, mun){
   if (!mun) return Promise.resolve(null);
-  return fetch(URL_KB_REF + "?accion=refs&municipio=" + encodeURIComponent(mun))
+  return fetch(SUPA_URL_REF + "/rest/v1/referencias?municipio=eq." + encodeURIComponent(mun) + "&select=*&order=fecha.asc", { headers: { apikey: SUPA_ANON_REF, Authorization: "Bearer " + SUPA_ANON_REF } })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      var refs = (d && d.refs) || [];
+      var refs = Array.isArray(d) ? d : [];
       var elegido = null;
       refs.forEach(function(r){
         if (String(r.tema || "").trim().toLowerCase() === String(sec || "").trim().toLowerCase()) {
@@ -5801,18 +5802,20 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
 <script>
 /* ============ fcConocimiento: Base de Conocimiento compartida ============
    Cada estudio que FactiCuba genera queda guardado en la Base de Conocimiento
-   (hoja de Google de la cuenta de negocios, servidor propio), junto con la
+   (tablas «estudios» y «referencias» de Supabase, proyecto apps-leonardo —
+   migración del 2026-11-20; antes vivía en una hoja de Google), junto con la
    referencia web de ventas cuando se buscó. Así los estudios posteriores de
    FactiCuba y de FactiCuba-Datos aprovechan lo ya aprendido sin volver a
    buscar en la web: las apps consultan primero la base.
    Todo es silencioso y con red de seguridad: si no hay conexión, no pasa nada. */
 (function () {
   "use strict";
-  var URL_KB = "https://script.google.com/macros/s/AKfycbzDmBLwgQj0Mx-YKryieWePKs7jFO29FX5D1Mn3KLj9ICnkSUsJwztwtNzUHj6e_5PJ6g/exec";
+  var SUPA_URL = "https://uczlkdzvzbqgzzlhcmro.supabase.co";
+  var SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjemxrZHp2emJxZ3p6bGhjbXJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMzU2ODAsImV4cCI6MjExMDcxMTY4MH0.3xwFjVbL-Usa9hohxU0u__alXH8ZsdsJhH5CWllkH1M";
   function R() { try { return (typeof ultimoResultado !== "undefined" && ultimoResultado) || null; } catch (e) { return null; } }
-  function kbPost(obj) {
+  function kbPost(tabla, fila) {
     try {
-      fetch(URL_KB, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(obj) }).then(function (r) { return r.text(); }).catch(function () {});
+      fetch(SUPA_URL + "/rest/v1/" + tabla, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPA_ANON, Authorization: "Bearer " + SUPA_ANON, Prefer: "return=minimal" }, body: JSON.stringify(fila) }).catch(function () {});
     } catch (e) {}
   }
   function textoSel(id) {
@@ -5828,14 +5831,14 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
     var resumen = "Dictamen: " + (r.dict || "—") + " · Inversión total: " + Math.round(r.invTotalCUP || r.inv || 0) + " CUP · VAN: " + Math.round(r.van || 0) + " CUP · TIR: " + tir + " · Margen neto: " + Math.round((r.margen || 0) * 10) / 10 + " %";
     var tasa = 0;
     try { tasa = typeof tasaActiva === "function" ? (tasaActiva("USD") || 0) : 0; } catch (e) {}
-    kbPost({ accion: "guardar_estudio", estudio: {
+    kbPost("estudios", {
       app: "FactiCuba", usuario: "Leonardo", provincia: prov, municipio: mun,
-      proyecto: r.nombre || textoSel("nombre") || "Proyecto sin nombre",
+      proyecto_o_programa: r.nombre || textoSel("nombre") || "Proyecto sin nombre",
       resumen: resumen,
       total_cup: Math.round(r.invTotalCUP || r.inv || 0),
-      total_usd: tasa ? Math.round((r.invTotalCUP || 0) / tasa) : "",
-      nota: r.dict || ""
-    }});
+      total_usd: tasa ? Math.round((r.invTotalCUP || 0) / tasa) : null,
+      dictamen_o_nota: r.dict || ""
+    });
     var ref = refPrevia || null;
     if (!ref) { try { ref = window._refWeb || null; } catch (e) {} }
     if (ref && ref.diaMedio && !ref.sinDatos) {
@@ -5845,12 +5848,12 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
       if (ya !== clave) {
         try { localStorage.setItem("fcKbRefGuardada", clave); } catch (e) {}
         var fuentes = (ref.fuentes || []).map(function (f) { return f.fuente; }).filter(Boolean);
-        kbPost({ accion: "guardar_refs", refs: [{
+        kbPost("referencias", {
           app: "FactiCuba", provincia: prov, municipio: ref.municipio || mun, tema: ref.sector || "",
           dato: "Ventas de referencia de negocios parecidos (" + (ref.nivel || "municipio") + "): entre " + ref.diaBajo + " y " + ref.diaAlto + " CUP al día; valor del medio " + ref.diaMedio + " CUP/día (≈ " + ref.mesMedio + " CUP al mes, 26 días). Costo típico del sector: " + (ref.costoPct || "—") + " %.",
           fuente: fuentes.length ? fuentes.join(" · ") : "Web",
           url: (ref.fuentes && ref.fuentes[0] && ref.fuentes[0].url) || ""
-        }]});
+        });
       }
     }
   }
@@ -5884,7 +5887,8 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
 (function () {
   "use strict";
   var URL_AGENTE = "https://script.google.com/macros/s/AKfycbzVAc0OZAWV8_XDeiRBRGDVYw7YZoDla99r89i6azBy54IzzM5aF8TlTvR5iPcrDvaLWg/exec";
-  var URL_KB = "https://script.google.com/macros/s/AKfycbzDmBLwgQj0Mx-YKryieWePKs7jFO29FX5D1Mn3KLj9ICnkSUsJwztwtNzUHj6e_5PJ6g/exec";
+  var SUPA_URL_AG = "https://uczlkdzvzbqgzzlhcmro.supabase.co";
+  var SUPA_ANON_AG = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjemxrZHp2emJxZ3p6bGhjbXJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMzU2ODAsImV4cCI6MjExMDcxMTY4MH0.3xwFjVbL-Usa9hohxU0u__alXH8ZsdsJhH5CWllkH1M";
   var sondeo = null, hallazgos = [], lugarActual = { p: "", m: "" };
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function textoSel(id) {
@@ -5938,7 +5942,7 @@ window.fcPerfil = { completar: completar, perfil: perfil, pintar: pintar };
           }).join("") +
           '<div style="margin-top:10px"><button type="button" class="btn" id="fcAgKB">💾 Guardar estos hallazgos en la Base de Conocimiento</button> <button type="button" class="btn" id="fcAgPedir">🔎 Volver a estudiar</button></div>';
         document.getElementById("fcAgKB").addEventListener("click", function () {
-          fetch(URL_KB, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ accion: "guardar_refs", refs: hallazgos.map(function (h) { return { app: "FactiCuba", provincia: lugarActual.p, municipio: lugarActual.m, tema: h.sector, dato: h.hallazgo, fuente: h.fuente, url: h.url }; }) }) })
+          fetch(SUPA_URL_AG + "/rest/v1/referencias", { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPA_ANON_AG, Authorization: "Bearer " + SUPA_ANON_AG, Prefer: "return=minimal" }, body: JSON.stringify(hallazgos.map(function (h) { return { app: "FactiCuba", provincia: lugarActual.p, municipio: lugarActual.m, tema: h.sector, dato: h.hallazgo, fuente: h.fuente, url: h.url }; })) })
             .then(function () { if (typeof toast === "function") toast("📚 Hallazgos guardados en la Base de Conocimiento"); })
             .catch(function () {});
         });
